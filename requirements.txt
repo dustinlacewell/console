@@ -1,0 +1,5 @@
+click
+urwid
+twisted
+docker-py
+attrdict
