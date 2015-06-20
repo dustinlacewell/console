@@ -1,6 +1,6 @@
-import json
-
 import urwid
+
+import os
 
 from twisted.internet import threads, reactor
 
@@ -21,6 +21,10 @@ class ImagePane(Pane):
         self.edit = AlwaysFocusedEdit("filter: ", multiline=False)
         self.listing = self.init_listing()
         self.filter = ""
+	self.marked = False 
+	self.marked_count = 0
+        self.at_edge = False
+        self.edges = [True, False]
         Pane.__init__(self, urwid.Frame(
             self.listing,
             self.edit,
@@ -112,25 +116,79 @@ class ImagePane(Pane):
         elif event == 'toggle-show-all':
             self.on_all()
         elif event == 'delete-image':
-            self.on_delete()
+	    if self.marked:
+                self.delete_marked()
+            else:
+                self.on_delete()
         elif event == 'tag-image':
             self.on_tag()
         elif event == 'inspect-details':
             self.on_inspect()
         elif event == 'help':
             self.on_help()
+	elif event == 'set-mark' and not app.state.images.all:
+	    self.on_marked()
         else:
             return super(ImagePane, self).handle_event(event)
 
     def on_next(self):
+	if self.marked_count == 1:
+	    self.marking_down = True
+	if self.marked:
+       	    if self.marking_down:
+                if self.at_edge:
+                    return super(ImagePane, self).handle_event(' ')
+	        self.mark_image()
+            else:
+	        self.unmark_image()
+        self.at_edge = self.listing.at_edge()
         self.listing.next()
 
     def on_prev(self):
+	if self.marked_count == 1:
+	    self.marking_down = False
+	if self.marked: 
+            if not self.marking_down:
+                if self.at_edge:
+                    return super(ImagePane, self).handle_event(' ')
+	        self.mark_image()
+	    else:
+	        self.unmark_image()
+        self.at_edge = self.listing.at_edge()
         self.listing.prev()
 
+    def mark_image(self):
+        self.at_edge = self.listing.at_edge()
+        self.marked_count += 1
+        if self.marked_count >= 1:
+            self.listing.mark()
+
+    def unmark_image(self):
+        self.marked_count -= 1
+        self.listing.unmark()
+
     def on_all(self):
+        if self.marked:
+            self.on_marked()
         app.state.images.all = not app.state.images.all
 
+    def on_marked(self):
+	self.marked = not self.marked
+	if self.marked:
+	    self.marked_count += 1
+	    self.listing.mark()
+	else:
+	    self.marked = True
+	    marked_rows = self.marked_count
+	    for x in xrange(marked_rows - 1):
+		if marked_rows != 1:
+      	            if self.marking_down:
+		        self.handle_event('prev-image') 			
+		    else:
+		        self.handle_event('next-image') 			
+	    self.marked = False
+ 	    self.marked_count = 0
+	    self.listing.unmark()
 
     # def _show_history(self, history_json, image_id):
     #     history = json.loads(history_json)
@@ -153,6 +211,18 @@ class ImagePane(Pane):
     #     d.addCallback(self._show_history, widget.image)
     #     d.addCallback(lambda r: app.draw_screen())
     #     return d
+
+    def delete_marked(self):
+	marked_rows = self.marked_count
+	self.on_marked()
+        for x in xrange(marked_rows - 1):
+            self.on_delete()
+	    self.marked_count -= 1
+	    if self.marking_down:
+                self.handle_event('next-image')
+            else:
+                self.handle_event('prev-image')
+	self.on_delete()
 
     @catch_docker_errors
     def on_delete(self):

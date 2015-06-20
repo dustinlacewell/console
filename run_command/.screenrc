@@ -1,0 +1,2 @@
+screen 0 docker exec -it 61f78147bb00f80f634645eea439ad19a15058e685110bdd3be1947a6e696362 bash
+screen 1 docker exec -it 304a33b7296abf743ad89aa0eb0a02b81cb46b213f6d5680b3d731c0c62c0d87 bash

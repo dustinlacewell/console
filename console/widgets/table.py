@@ -126,6 +126,29 @@ class Table(urwid.ListBox):
     def set_focus(self, pos):
         super(Table, self).set_focus(max(0, min(pos, len(self.walker) - 1)))
 
+    def at_edge(self):
+        widget, pos = self.get_focus()
+        x = max(0, min(pos + 1, len(self.walker) - 1))
+        if x == 2 or x == len(self.walker) - 1:
+            return True
+        else:
+            return False
+
+    def update_edges(self, edges):
+        top = edges[0]
+        bottom = edges[1]
+        widget, pos = self.get_focus()
+        x = max(0, min(pos + 1, len(self.walker) - 1))
+        if x == 0 or x == len(self.walker) - 1:
+            if x == 0:
+                top = True
+            if x == len(self.walker) - 1:
+                bottom = True
+        else:
+            top = False
+            bottom = False
+        return [top, bottom]
+
     def next(self):
         widget, pos = self.get_focus()
         self.set_focus(pos + 1)
@@ -136,6 +159,14 @@ class Table(urwid.ListBox):
             self.set_focus(max(pos - 1, 1))
         else:
             self.set_focus(pos - 1)
+
+    def mark(self):
+	widget, pos = self.get_focus()
+	widget.set_attr_map({None: 'reversed'})
+
+    def unmark(self):
+	widget, pos = self.get_focus()
+	widget.set_attr_map({None: None})
 
     def keypress(self, *args, **kwargs):
         key = super(Table, self).keypress(*args, **kwargs)

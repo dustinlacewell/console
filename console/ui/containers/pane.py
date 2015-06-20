@@ -3,6 +3,8 @@ import json
 
 import docker
 import urwid
+import subprocess
+import os
 
 from twisted.internet import threads, reactor
 
@@ -36,6 +38,10 @@ class ContainerPane(Pane):
         self.edit = AlwaysFocusedEdit("filter: ", multiline=False)
         self.listing = self.init_listing()
         self.filter = ""
+	self.marked = False
+	self.marked_count = 0
+        self.at_edge = False
+        self.commands = ""
         Pane.__init__(self, urwid.Frame(
             self.listing,
             self.edit,
@@ -138,22 +144,127 @@ class ContainerPane(Pane):
         elif event == 'toggle-show-all':
             self.on_all()
         elif event == 'delete-container':
-            self.on_delete()
+	    if self.marked: 
+                self.delete_marked()
+            else: 
+                self.on_delete()
         elif event == 'commit-container':
             self.on_tag()
         elif event == 'inspect-details':
             self.on_inspect()
+	elif event == 'set-mark':
+	    self.on_marked()
+        elif event == 'run-container(s)':
+            self.on_run()
         else:
             return super(ContainerPane, self).handle_event(event)
 
+    def readFile(self, filename, mode = "rt"):
+        with open(filename, mode) as fin:
+            return fin.read()
+
+    def writeFile(self, filename, contents, mode = "wt"):
+        open("filename", "w").close() #clear file
+        with open(filename, mode) as fout:
+            fout.write(contents)
+
+    def writeCommands(self):
+        path = "run_command" + os.sep + ".screenrc"
+        if (not os.path.exists("run_command")):
+            os.makedirs("run_command")
+        if not os.path.exists(path) or self.readFile(path) == "":
+            self.writeFile(path, self.commands)
+        elif (os.path.exists(path) and self.readFile(path) != self.commands):
+            self.writeFile(path, self.commands)
+
+    def makeCommand(self):
+        id = self.get_Id()
+        row = 0
+        self.commands += "screen %d docker exec -it %s bash\n" % (row, id)
+        for x in xrange(self.marked_count - 1):
+            row += 1
+            if self.marking_down:
+                self.on_prev()
+            else:
+                self.on_next()
+            id = self.get_Id()
+            self.commands += "screen %d docker exec -it %s bash\n" % (row, id) 
+        self.writeCommands()
+    
+    def get_Id(self):
+        widget, idx = self.listing.get_focus()
+        info = app.client.inspect_container(widget.container)
+        id = info['Id']
+        return id
+
+    def on_run(self):
+        self.makeCommand()
+        subprocess.call(["screen", "-c", "run_command/.screenrc"])
+        app.client.close()
+        raise urwid.ExitMainLoop
+
     def on_next(self):
+        """move focus down. Mark or unmark if mark mode is on"""
+	if self.marked_count == 1: 
+            self.marking_down = True
+        if self.marked:
+            if self.marking_down:
+	        self.mark_containers()
+            else:
+	        self.unmark_containers()
         self.listing.next()
 
     def on_prev(self):
+	if self.marked_count == 1: 
+            self.marking_down = False
+        if self.marked:
+            if not self.marking_down:
+                self.mark_containers()
+            else:
+	        self.unmark_containers()
         self.listing.prev()
+
+    def mark_containers(self):
+	self.marked_count += 1
+	if self.marked_count >= 1:
+	    self.listing.mark()
+
+    def unmark_containers(self):
+	self.marked_count -= 1
+	self.listing.unmark()
+
+    def on_marked(self):
+        """Start or end mark mode"""
+	self.marked = not self.marked
+	if self.marked:
+	    self.marked_count += 1
+	    self.listing.mark()
+        else:
+	    self.marked = True
+	    marked_rows = self.marked_count
+	    for x in xrange(marked_rows - 1):
+                if marked_rows != 1:
+                    if self.marking_down:
+                        self.on_prev()
+                    else:
+                        self.on_next()
+	    self.marked_count = 0
+	    self.listing.unmark()
 
     def on_all(self):
         app.state.containers.all = not app.state.containers.all
+
+    def delete_marked(self):
+	marked_rows = self.marked_count
+	for x in xrange(marked_rows - 1):
+	    self.on_delete()
+	    self.marked_count -= 1
+	    if self.marking_down: 
+                self.on_prev()
+	    else: 
+                self.on_next()
+	self.on_delete()
+	self.marked = False
 
     @catch_docker_errors
     def on_delete(self):
