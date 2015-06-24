@@ -23,6 +23,7 @@ class ImagePane(Pane):
         self.filter = ""
 	self.marked = False 
 	self.marked_count = 0
+        self.marking_down = True
         self.at_edge = False
         self.edges = [True, False]
         Pane.__init__(self, urwid.Frame(
@@ -141,7 +142,7 @@ class ImagePane(Pane):
 	        self.mark_image()
             else:
 	        self.unmark_image()
-        self.at_edge = self.listing.at_edge()
+        self.at_edge = self.listing.at_edge(self.marking_down)
         self.listing.next()
 
     def on_prev(self):
@@ -154,11 +155,11 @@ class ImagePane(Pane):
 	        self.mark_image()
 	    else:
 	        self.unmark_image()
-        self.at_edge = self.listing.at_edge()
+        self.at_edge = self.listing.at_edge(self.marking_down)
         self.listing.prev()
 
     def mark_image(self):
-        self.at_edge = self.listing.at_edge()
+        self.at_edge = self.listing.at_edge(self.marking_down)
         self.marked_count += 1
         if self.marked_count >= 1:
             self.listing.mark()

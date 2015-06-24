@@ -42,6 +42,7 @@ class ContainerPane(Pane):
 	self.marked_count = 0
         self.at_edge = False
         self.commands = ""
+        self.marking_down = True
         Pane.__init__(self, urwid.Frame(
             self.listing,
             self.edit,
@@ -209,9 +210,12 @@ class ContainerPane(Pane):
             self.marking_down = True
         if self.marked:
             if self.marking_down:
+                if self.at_edge:
+                    return super(ContainerPane, self).handle_event(' ')
 	        self.mark_containers()
             else:
 	        self.unmark_containers()
+        self.at_edge = self.listing.at_edge(self.marking_down)
         self.listing.next()
 
     def on_prev(self):
@@ -219,12 +223,16 @@ class ContainerPane(Pane):
             self.marking_down = False
         if self.marked:
             if not self.marking_down:
+                if self.at_edge:
+                    return super(ContainerPane, self).handle_event(' ')
                 self.mark_containers()
             else:
 	        self.unmark_containers()
+        self.at_edge = self.listing.at_edge(self.marking_down)
         self.listing.prev()
 
     def mark_containers(self):
+        self.at_edge = self.listing.at_edge(self.marking_down)
 	self.marked_count += 1
 	if self.marked_count >= 1:
 	    self.listing.mark()
@@ -248,10 +256,13 @@ class ContainerPane(Pane):
                         self.on_prev()
                     else:
                         self.on_next()
+            self.marked = False
 	    self.marked_count = 0
 	    self.listing.unmark()
 
     def on_all(self):
+        if self.marked:
+            self.on_marked()
         app.state.containers.all = not app.state.containers.all
 
     def delete_marked(self):

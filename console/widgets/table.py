@@ -126,10 +126,12 @@ class Table(urwid.ListBox):
     def set_focus(self, pos):
         super(Table, self).set_focus(max(0, min(pos, len(self.walker) - 1)))
 
-    def at_edge(self):
+    def at_edge(self, direction):
         widget, pos = self.get_focus()
         x = max(0, min(pos + 1, len(self.walker) - 1))
-        if x == 2 or x == len(self.walker) - 1:
+        if x == 3 and not direction:
+            return True
+        if x == len(self.walker) - 1 and direction:
             return True
         else:
             return False
