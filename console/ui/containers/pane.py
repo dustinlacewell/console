@@ -6,6 +6,7 @@ import urwid
 import subprocess
 import os
 import tempfile
+import shutil
 
 from twisted.internet import threads, reactor
 
@@ -39,9 +40,6 @@ class ContainerPane(Pane):
         self.edit = AlwaysFocusedEdit("filter: ", multiline=False)
         self.listing = self.init_listing()
         self.filter = ""
-        self.marked = False
-        self.marked_count = 0
-        self.at_edge = False
         self.commands = ""
         self.marked_containers = {}
         self.marked_ids = {}
@@ -142,9 +140,9 @@ class ContainerPane(Pane):
 
     def handle_event(self, event):
         if event == 'next-container':
-            self.dict_on_next()
+            self.on_next()
         elif event == 'prev-container':
-            self.dict_on_prev()
+            self.on_prev()
         elif event == 'toggle-show-all':
             self.on_all()
         elif event == 'delete-container':
@@ -154,9 +152,11 @@ class ContainerPane(Pane):
         elif event == 'inspect-details':
             self.on_inspect()
         elif event == 'set-mark':
-            self.dict_mark()
+            self.on_mark()
         elif event == 'run-container(s)':
-            self.dict_on_run()
+            self.on_run()
+        elif event == 'unmark-containers':
+            self.on_unmark()
         else:
             return super(ContainerPane, self).handle_event(event)
 
@@ -198,23 +198,34 @@ class ContainerPane(Pane):
         id = info['Id']
         return id
     
-    def dict_make_command(self):
+    def make_command(self):
         row = 0
         for k, v in self.marked_ids.items():
             if v == "marked":
                 self.commands += "screen %d docker exec -it %s bash\n" % (row, k)
         self.write_commands()
 
-    def dict_on_run(self):
-        self.dict_make_command()
+    def on_run(self):
+        self.make_command()
         subprocess.call(["screen", "-c", "run_command/.screenrc"])
+        #temp = tempfile.mkdtemp()
+        #filename = os.path.join(temp, '.screenrc')
+        #self.write_file(filename, self.commands)
+        
+        #temp = tempfile.NamedTemporaryFile()
+        #temp.write(self.commands)
+        #print temp.read()
+        #temp.close() 
+        #subprocess.call(["screen", "-c", "%s" % filename])
+        #shutil.rmtree(temp)
+        
         app.client.close()
         raise urwid.ExitMainLoop
 
-    def dict_on_next(self):
+    def on_next(self):
         self.listing.next()
 
-    def dict_on_prev(self):
+    def on_prev(self):
         self.listing.prev()
 
     def mark_containers(self):
@@ -227,7 +238,7 @@ class ContainerPane(Pane):
         widget, idx = self.listing.get_focus()
         return widget
 
-    def dict_mark(self):
+    def on_mark(self):
         marked_widget = self.get_widget()
         marked_id = self.get_Id()
         if marked_widget in self.marked_containers:
@@ -239,9 +250,13 @@ class ContainerPane(Pane):
             self.marked_ids[marked_id] = "marked"
             self.listing.mark()
 
+    def on_unmark(self):
+        for key, value in self.marked_containers.items():
+            if value == "marked":
+                self.marked_containers[key] = "unmarked"
+                key.set_attr_map({None:None})
+
     def on_all(self):
-        if self.marked:
-            self.on_marked()
         app.state.containers.all = not app.state.containers.all
     
     def dict_on_delete(self):

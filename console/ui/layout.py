@@ -17,7 +17,8 @@ class ImagesTab(Tab):
         'ctrl t': ('tag-image', 'tag the selected image'),
         'ctrl u': ('push-image', 'push the selected image'),
         'ctrl v': ('inspect-details', 'inspect the selected image'),
-        'ctrl k': ('set-mark', 'toggle mark mode for multi-selection'),
+        'ctrl k': ('set-mark', 'select current image'),
+        'ctrl u': ('unmark-images', 'unmark all selected images'),
     }
 
     def get_content(self):
@@ -33,8 +34,9 @@ class ContainersTab(Tab):
         'ctrl a': ('toggle-show-all', 'toggle whether all containers are shown'),
         'ctrl t': ('commit-container', 'commit the selected container'),
         'ctrl v': ('inspect-details', 'inspect the selected container'),
-        'ctrl k': ('set-mark', 'toggle mark mode for multi-selection'),
+        'ctrl k': ('set-mark', 'select current container'),
         'ctrl r': ('run-container(s)', 'run the selected container(s) in screen'), 
+        'ctrl u': ('unmark-containers', 'unmark all selected containers'),
     }
 
     def get_content(self):

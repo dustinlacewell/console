@@ -21,9 +21,6 @@ class ImagePane(Pane):
         self.edit = AlwaysFocusedEdit("filter: ", multiline=False)
         self.listing = self.init_listing()
         self.filter = ""
-        self.marked = False 
-        self.marked_count = 0
-        self.marking_down = True
         self.marked_widgets = {}
         Pane.__init__(self, urwid.Frame(
             self.listing,
@@ -125,6 +122,8 @@ class ImagePane(Pane):
             self.on_help()
         elif event == 'set-mark' and not app.state.images.all:
             self.on_marked()
+        elif event == 'unmark-images':
+            self.on_unmark()
         else:
             return super(ImagePane, self).handle_event(event)
 
@@ -134,15 +133,7 @@ class ImagePane(Pane):
     def on_prev(self):
         self.listing.prev()
 
-    def mark_image(self):
-        self.listing.mark()
-
-    def unmark_image(self):
-        self.listing.unmark()
-
     def on_all(self):
-        if self.marked:
-            self.on_marked()
         app.state.images.all = not app.state.images.all
 
     def get_widget(self):
@@ -157,6 +148,12 @@ class ImagePane(Pane):
         else:
             self.marked_widgets[marked_widget] = "marked"
             self.listing.mark()
+
+    def on_unmark(self):
+        for key, value in self.marked_widgets.items():
+            if value == "marked":
+                self.marked_widgets[key] = "unmarked"
+                key.set_attr_map({None:None})
 
     # def _show_history(self, history_json, image_id):
     #     history = json.loads(history_json)
