@@ -163,12 +163,12 @@ class Table(urwid.ListBox):
             self.set_focus(pos - 1)
 
     def mark(self):
-	widget, pos = self.get_focus()
-	widget.set_attr_map({None: 'reversed'})
+    widget, pos = self.get_focus()
+    widget.set_attr_map({None: 'reversed'})
 
     def unmark(self):
-	widget, pos = self.get_focus()
-	widget.set_attr_map({None: None})
+    widget, pos = self.get_focus()
+    widget.set_attr_map({None: None})
 
     def keypress(self, *args, **kwargs):
         key = super(Table, self).keypress(*args, **kwargs)

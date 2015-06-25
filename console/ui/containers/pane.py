@@ -5,6 +5,7 @@ import docker
 import urwid
 import subprocess
 import os
+import tempfile
 
 from twisted.internet import threads, reactor
 
@@ -38,10 +39,12 @@ class ContainerPane(Pane):
         self.edit = AlwaysFocusedEdit("filter: ", multiline=False)
         self.listing = self.init_listing()
         self.filter = ""
-	self.marked = False
-	self.marked_count = 0
+        self.marked = False
+        self.marked_count = 0
         self.at_edge = False
         self.commands = ""
+        self.marked_containers = {}
+        self.marked_ids = {}
         self.marking_down = True
         Pane.__init__(self, urwid.Frame(
             self.listing,
@@ -139,46 +142,43 @@ class ContainerPane(Pane):
 
     def handle_event(self, event):
         if event == 'next-container':
-            self.on_next()
+            self.dict_on_next()
         elif event == 'prev-container':
-            self.on_prev()
+            self.dict_on_prev()
         elif event == 'toggle-show-all':
             self.on_all()
         elif event == 'delete-container':
-	    if self.marked: 
-                self.delete_marked()
-            else: 
-                self.on_delete()
+            self.dict_on_delete()
         elif event == 'commit-container':
             self.on_tag()
         elif event == 'inspect-details':
             self.on_inspect()
-	elif event == 'set-mark':
-	    self.on_marked()
+        elif event == 'set-mark':
+            self.dict_mark()
         elif event == 'run-container(s)':
-            self.on_run()
+            self.dict_on_run()
         else:
             return super(ContainerPane, self).handle_event(event)
 
-    def readFile(self, filename, mode = "rt"):
+    def read_file(self, filename, mode = "rt"):
         with open(filename, mode) as fin:
             return fin.read()
 
-    def writeFile(self, filename, contents, mode = "wt"):
+    def write_file(self, filename, contents, mode = "wt"):
         open("filename", "w").close() #clear file
         with open(filename, mode) as fout:
             fout.write(contents)
 
-    def writeCommands(self):
+    def write_commands(self):
         path = "run_command" + os.sep + ".screenrc"
         if (not os.path.exists("run_command")):
             os.makedirs("run_command")
-        if not os.path.exists(path) or self.readFile(path) == "":
-            self.writeFile(path, self.commands)
-        elif (os.path.exists(path) and self.readFile(path) != self.commands):
-            self.writeFile(path, self.commands)
+        if not os.path.exists(path) or self.read_file(path) == "":
+            self.write_file(path, self.commands)
+        elif (os.path.exists(path) and self.read_file(path) != self.commands):
+            self.write_file(path, self.commands)
 
-    def makeCommand(self):
+    def make_command(self):
         id = self.get_Id()
         row = 0
         self.commands += "screen %d docker exec -it %s bash\n" % (row, id)
@@ -190,96 +190,72 @@ class ContainerPane(Pane):
                 self.on_next()
             id = self.get_Id()
             self.commands += "screen %d docker exec -it %s bash\n" % (row, id) 
-        self.writeCommands()
-    
+        self.write_commands()
+
     def get_Id(self):
         widget, idx = self.listing.get_focus()
         info = app.client.inspect_container(widget.container)
         id = info['Id']
         return id
+    
+    def dict_make_command(self):
+        row = 0
+        for k, v in self.marked_ids.items():
+            if v == "marked":
+                self.commands += "screen %d docker exec -it %s bash\n" % (row, k)
+        self.write_commands()
 
-    def on_run(self):
-        self.makeCommand()
+    def dict_on_run(self):
+        self.dict_make_command()
         subprocess.call(["screen", "-c", "run_command/.screenrc"])
         app.client.close()
         raise urwid.ExitMainLoop
 
-    def on_next(self):
-        """move focus down. Mark or unmark if mark mode is on"""
-	if self.marked_count == 1: 
-            self.marking_down = True
-        if self.marked:
-            if self.marking_down:
-                if self.at_edge:
-                    return super(ContainerPane, self).handle_event(' ')
-	        self.mark_containers()
-            else:
-	        self.unmark_containers()
-        self.at_edge = self.listing.at_edge(self.marking_down)
+    def dict_on_next(self):
         self.listing.next()
 
-    def on_prev(self):
-	if self.marked_count == 1: 
-            self.marking_down = False
-        if self.marked:
-            if not self.marking_down:
-                if self.at_edge:
-                    return super(ContainerPane, self).handle_event(' ')
-                self.mark_containers()
-            else:
-	        self.unmark_containers()
-        self.at_edge = self.listing.at_edge(self.marking_down)
+    def dict_on_prev(self):
         self.listing.prev()
 
     def mark_containers(self):
-        self.at_edge = self.listing.at_edge(self.marking_down)
-	self.marked_count += 1
-	if self.marked_count >= 1:
-	    self.listing.mark()
+        self.listing.mark()
 
     def unmark_containers(self):
-	self.marked_count -= 1
-	self.listing.unmark()
+        self.listing.unmark()
 
-    def on_marked(self):
-        """Start or end mark mode"""
-	self.marked = not self.marked
-	if self.marked:
-	    self.marked_count += 1
-	    self.listing.mark()
+    def get_widget(self):
+        widget, idx = self.listing.get_focus()
+        return widget
+
+    def dict_mark(self):
+        marked_widget = self.get_widget()
+        marked_id = self.get_Id()
+        if marked_widget in self.marked_containers:
+            self.marked_containers[marked_widget] = "unmarked"
+            self.marked_ids[marked_id] = "unmarked"
+            self.listing.unmark()
         else:
-	    self.marked = True
-	    marked_rows = self.marked_count
-	    for x in xrange(marked_rows - 1):
-                if marked_rows != 1:
-                    if self.marking_down:
-                        self.on_prev()
-                    else:
-                        self.on_next()
-            self.marked = False
-	    self.marked_count = 0
-	    self.listing.unmark()
+            self.marked_containers[marked_widget] = "marked"
+            self.marked_ids[marked_id] = "marked"
+            self.listing.mark()
 
     def on_all(self):
         if self.marked:
             self.on_marked()
         app.state.containers.all = not app.state.containers.all
-
-    def delete_marked(self):
-	marked_rows = self.marked_count
-	for x in xrange(marked_rows - 1):
-	    self.on_delete()
-	    self.marked_count -= 1
-	    if self.marking_down: 
-                self.on_prev()
-	    else: 
-                self.on_next()
-	self.on_delete()
-	self.marked = False
-
+    
+    def dict_on_delete(self):
+        for key, value in self.marked_containers.items():
+            if value == "marked":
+                widget = key
+                self.on_delete(widget)
+                del self.marked_containers[key]
+        for k, v in self.marked_ids.items():
+            if v == "marked":
+                del self.marked_ids[k]
+    
     @catch_docker_errors
-    def on_delete(self):
-        widget, idx = self.listing.get_focus()
+    def on_delete(self, widget):
         highlighter.apply(widget, 'deleted', 'deleted')
         reactor.callLater(2.5, highlighter.remove, widget)
         return threads.deferToThread(app.client.remove_container, widget.container)
