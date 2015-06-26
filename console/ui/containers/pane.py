@@ -153,44 +153,18 @@ class ContainerPane(Pane):
             self.on_inspect()
         elif event == 'set-mark':
             self.on_mark()
-        elif event == 'run-container(s)':
+        elif event == 'run-container(s)' and self.marked_exists():
             self.on_run()
         elif event == 'unmark-containers':
             self.on_unmark()
         else:
             return super(ContainerPane, self).handle_event(event)
 
-    def read_file(self, filename, mode = "rt"):
-        with open(filename, mode) as fin:
-            return fin.read()
-
-    def write_file(self, filename, contents, mode = "wt"):
-        open("filename", "w").close() #clear file
-        with open(filename, mode) as fout:
-            fout.write(contents)
-
-    def write_commands(self):
-        path = "run_command" + os.sep + ".screenrc"
-        if (not os.path.exists("run_command")):
-            os.makedirs("run_command")
-        if not os.path.exists(path) or self.read_file(path) == "":
-            self.write_file(path, self.commands)
-        elif (os.path.exists(path) and self.read_file(path) != self.commands):
-            self.write_file(path, self.commands)
-
-    def make_command(self):
-        id = self.get_Id()
-        row = 0
-        self.commands += "screen %d docker exec -it %s bash\n" % (row, id)
-        for x in xrange(self.marked_count - 1):
-            row += 1
-            if self.marking_down:
-                self.on_prev()
-            else:
-                self.on_next()
-            id = self.get_Id()
-            self.commands += "screen %d docker exec -it %s bash\n" % (row, id) 
-        self.write_commands()
+    def marked_exists(self):
+        for k, v in self.marked_ids.items():
+            if v == "marked":
+                return True
+        return False
 
     def get_Id(self):
         widget, idx = self.listing.get_focus()
@@ -203,22 +177,16 @@ class ContainerPane(Pane):
         for k, v in self.marked_ids.items():
             if v == "marked":
                 self.commands += "screen %d docker exec -it %s bash\n" % (row, k)
-        self.write_commands()
 
     def on_run(self):
         self.make_command()
-        subprocess.call(["screen", "-c", "run_command/.screenrc"])
-        #temp = tempfile.mkdtemp()
-        #filename = os.path.join(temp, '.screenrc')
-        #self.write_file(filename, self.commands)
-        
-        #temp = tempfile.NamedTemporaryFile()
-        #temp.write(self.commands)
-        #print temp.read()
-        #temp.close() 
-        #subprocess.call(["screen", "-c", "%s" % filename])
-        #shutil.rmtree(temp)
-        
+        #subprocess.call(["screen", "-c", "run_command/.screenrc"])
+        temp = tempfile.NamedTemporaryFile()
+        name = temp.name
+        with open(name, "wt") as fout:
+            fout.write(self.commands)
+        subprocess.call(["screen", "-c", "%s" % name])
+        temp.close()
         app.client.close()
         raise urwid.ExitMainLoop
 
@@ -228,12 +196,6 @@ class ContainerPane(Pane):
     def on_prev(self):
         self.listing.prev()
 
-    def mark_containers(self):
-        self.listing.mark()
-
-    def unmark_containers(self):
-        self.listing.unmark()
-
     def get_widget(self):
         widget, idx = self.listing.get_focus()
         return widget
@@ -241,7 +203,8 @@ class ContainerPane(Pane):
     def on_mark(self):
         marked_widget = self.get_widget()
         marked_id = self.get_Id()
-        if marked_widget in self.marked_containers:
+        if (marked_widget in self.marked_containers and 
+                self.marked_containers[marked_widget] == "marked"):
             self.marked_containers[marked_widget] = "unmarked"
             self.marked_ids[marked_id] = "unmarked"
             self.listing.unmark()
@@ -294,3 +257,5 @@ class ContainerPane(Pane):
         d = threads.deferToThread(app.client.inspect_container, widget.container)
         d.addCallback(lambda data: self.show_dialog(ContainerInspector(data)))
         return d
+    
+    

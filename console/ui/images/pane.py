@@ -142,7 +142,8 @@ class ImagePane(Pane):
 
     def on_marked(self):
         marked_widget = self.get_widget()
-        if marked_widget in self.marked_widgets:
+        if (marked_widget in self.marked_widgets and 
+                self.marked_widgets[marked_widget] == "marked"):
             self.marked_widgets[marked_widget] = "unmarked"
             self.listing.unmark()
         else:
