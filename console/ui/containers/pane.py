@@ -217,6 +217,7 @@ class ContainerPane(Pane):
         for key, value in self.marked_containers.items():
             if value == "marked":
                 self.marked_containers[key] = "unmarked"
+                self.marked_ids[key] = "unmarked"
                 key.set_attr_map({None:None})
 
     def on_all(self):
