@@ -126,6 +126,8 @@ class ImagePane(Pane):
             self.on_unmark()
         elif event == 'view-history':
             self.on_history()
+        elif event == 'push-image':
+            self.push()
         else:
             return super(ImagePane, self).handle_event(event)
 
@@ -219,6 +221,7 @@ class ImagePane(Pane):
 
         def handle_response(r):
             r = r.replace("}{", "},{")
+            r = r.replace("1)\"}", "1)\"},")
             r = "[%s]" % r
             messages = [d.get('status') or d.get('error') for d in json.loads(r)]
             self.show_dialog(MessageListBox(messages, title='Push Response', width=100))

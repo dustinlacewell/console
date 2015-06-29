@@ -15,7 +15,7 @@ class ImagesTab(Tab):
         'ctrl y': ('view-history', 'view history of selected image'),
         'ctrl a': ('toggle-show-all', 'toggle whether all image layers are shown'),
         'ctrl t': ('tag-image', 'tag the selected image'),
-        'ctrl u': ('push-image', 'push the selected image'),
+        'ctrl b': ('push-image', 'push the selected image'),
         'ctrl v': ('inspect-details', 'inspect the selected image'),
         'ctrl k': ('set-mark', 'select current image'),
         'ctrl u': ('unmark-images', 'unmark all selected images'),

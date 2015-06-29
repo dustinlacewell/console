@@ -2,6 +2,7 @@ import urwid
 
 from console.widgets.table import TableCell, TableRow, DeadTable
 from console.widgets.listbox import FancyListBox
+from console.app import app
 
 
 class PopupPile(urwid.Pile):
