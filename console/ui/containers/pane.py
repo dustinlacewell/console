@@ -6,7 +6,6 @@ import urwid
 import subprocess
 import os
 import tempfile
-import shutil
 
 from twisted.internet import threads, reactor
 

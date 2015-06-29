@@ -85,13 +85,8 @@ class TableDialog(PopupPile):
             cells = []
             for idx, cell in enumerate(row):
                 if headers:
-                    cells.append(
-                        TableCell(
-                            cell,
-                            weight=headers[idx].weight,
-                            align=headers[idx].align,
-                        )
-                    )
+                    cells.append({'value':cell, 'weight':headers[idx].get('weight'), 
+                        'align':headers[idx].get('align')})
                 else:
                     cells.append(TableCell(cell))
             rows.append(TableRow(cells))

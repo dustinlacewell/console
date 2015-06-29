@@ -1,18 +1,18 @@
 import urwid
 
 import os
+import json
 
 from twisted.internet import threads, reactor
 
 from console.app import app
 from console.ui.images.inspect import ImageInspector
 from console.widgets.extra import AlwaysFocusedEdit
-from console.widgets.table import Table
+from console.widgets.table import Table, TableCell
 from console.highlights import highlighter
 from console.widgets.pane import Pane
-from console.widgets.dialogs import Prompt, MessageListBox
+from console.widgets.dialogs import Prompt, MessageListBox, TableDialog
 from console.utils import catch_docker_errors, split_repo_name
-
 
 class ImagePane(Pane):
     def __init__(self):
@@ -124,6 +124,8 @@ class ImagePane(Pane):
             self.on_marked()
         elif event == 'unmark-images':
             self.on_unmark()
+        elif event == 'view-history':
+            self.on_history()
         else:
             return super(ImagePane, self).handle_event(event)
 
@@ -156,27 +158,27 @@ class ImagePane(Pane):
                 self.marked_widgets[key] = "unmarked"
                 key.set_attr_map({None:None})
 
-    # def _show_history(self, history_json, image_id):
-    #     history = json.loads(history_json)
-    #     histories = [(d.get('Id', '')[:12], d.get('CreatedBy', '')) for d in history]
-    #     dialog = TableDialog(
-    #         "History for %s" % image_id[:12],
-    #         histories,
-    #         [
-    #             TableCell("image id", align='center'),
-    #             TableCell("command", align='left', weight=4)
-    #         ]
-    #     )
-    #     dialog.width = ('relative', 90)
-    #     self.show_dialog(dialog, )
+    def _show_history(self, history_json, image_id):
+        history = history_json
+        histories = [(d.get('Id', '')[:12], d.get('CreatedBy', '')) for d in history]
+        dialog = TableDialog(
+            "History for %s" % image_id[:12],
+            histories,
+            [
+                {'value':"image id", 'weight':1, 'align':'center'},
+                {'value':"command", 'weight':4, 'align':'center'}
+            ]
+        )
+        dialog.width = ('relative', 90)
+        self.show_dialog(dialog, )
 
-    # @catch_docker_errors
-    # def on_history(self):
-    #     widget, idx = self.listing.get_focus()
-    #     d = threads.deferToThread(app.client.history, widget.image)
-    #     d.addCallback(self._show_history, widget.image)
-    #     d.addCallback(lambda r: app.draw_screen())
-    #     return d
+    @catch_docker_errors
+    def on_history(self):
+        widget, idx = self.listing.get_focus()
+        d = threads.deferToThread(app.client.history, widget.image)
+        d.addCallback(self._show_history, widget.image)
+        d.addCallback(lambda r: app.draw_screen())
+        return d
 
     def delete_marked(self):
         for key, value in self.marked_widgets.items():

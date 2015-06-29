@@ -12,7 +12,7 @@ class ImagesTab(Tab):
         'ctrl n': ('next-image', 'select the next image'),
         'ctrl p': ('prev-image', 'select the previous image'),
         'ctrl d': ('delete-image', 'delete the selected image'),
-        'ctrl h': ('view-history', 'view history of selected image'),
+        'ctrl y': ('view-history', 'view history of selected image'),
         'ctrl a': ('toggle-show-all', 'toggle whether all image layers are shown'),
         'ctrl t': ('tag-image', 'tag the selected image'),
         'ctrl u': ('push-image', 'push the selected image'),
