@@ -27,6 +27,10 @@ def split_repo_name(name):
             return name, ''
     return name, None
 
+def clean_name(name):
+    name = name.replace("u","")
+    name = name.replace("'","")
+    return name
 
 class AlwaysFocusedEdit(urwid.Edit):
     def render(self, size, focus=False):
@@ -70,6 +74,7 @@ class ContainerPane(Pane):
         })
         row.image = container['image']
         row.container = container['id']
+        row.name = container['names']
         self.containers[row.container] = row
         return row
 
@@ -153,6 +158,8 @@ class ContainerPane(Pane):
             self.on_run()
         elif event == 'unmark-containers':
             self.on_unmark()
+        elif event == 'rename-container':
+            self.on_rename()
         else:
             return super(ContainerPane, self).handle_event(event)
 
@@ -213,10 +220,13 @@ class ContainerPane(Pane):
         for key, value in self.marked_containers.items():
             if value == "marked":
                 self.marked_containers[key] = "unmarked"
-                self.marked_ids[key] = "unmarked"
                 key.set_attr_map({None:None})
+        for key, value in self.marked_ids.items():
+            if value == "marked":
+                self.marked_ids[key] = "unmarked"
 
     def on_all(self):
+        self.on_unmark()
         app.state.containers.all = not app.state.containers.all
     
     def dict_on_delete(self):
@@ -249,10 +259,20 @@ class ContainerPane(Pane):
         self.show_dialog(prompt)
 
     @catch_docker_errors
+    def perform_rename(self, container, name):
+        self.close_dialog()
+        return threads.deferToThread(app.client.rename, container, name)
+        
+    def on_rename(self):
+        widget, idx = self.listing.get_focus()
+        name = clean_name(widget.name[0])
+        prompt = Prompt(lambda name: self.perform_rename(widget.container, name), title="Rename Container:", initial=name)
+        self.show_dialog(prompt)
+
+    @catch_docker_errors
     def on_inspect(self):
         widget, idx = self.listing.get_focus()
         d = threads.deferToThread(app.client.inspect_container, widget.container)
         d.addCallback(lambda data: self.show_dialog(ContainerInspector(data)))
         return d
-    
-    
+

@@ -229,7 +229,7 @@ class ImagePane(Pane):
 
         d.addCallback(handle_response)
         return d
-
+    
     @catch_docker_errors
     def on_inspect(self):
         widget, idx = self.listing.get_focus()

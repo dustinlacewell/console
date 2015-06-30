@@ -37,6 +37,7 @@ class ContainersTab(Tab):
         'ctrl k': ('set-mark', 'select current container'),
         'ctrl r': ('run-container(s)', 'run the selected container(s) in screen'), 
         'ctrl u': ('unmark-containers', 'unmark all selected containers'),
+        'ctrl e': ('rename-container', 'rename the selected container'),
     }
 
     def get_content(self):
