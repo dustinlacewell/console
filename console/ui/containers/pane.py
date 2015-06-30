@@ -124,10 +124,7 @@ class ContainerPane(Pane):
 
     def keypress(self, size, event):
         if self.dialog:
-            if event == 'close-dialog':
-                return self.close_dialog()
-            else:
-                return self.dialog.keypress(size, event)
+            return super(ContainerPane, self).keypress(size, event)
 
         if self.listing.keypress(size, event):
             if self.handle_event(event):
@@ -147,7 +144,7 @@ class ContainerPane(Pane):
         elif event == 'delete-container':
             self.dict_on_delete()
         elif event == 'commit-container':
-            self.on_tag()
+            self.on_commit()
         elif event == 'inspect-details':
             self.on_inspect()
         elif event == 'set-mark':
@@ -176,10 +173,10 @@ class ContainerPane(Pane):
         for k, v in self.marked_ids.items():
             if v == "marked":
                 self.commands += "screen %d docker exec -it %s bash\n" % (row, k)
+                row += 1
 
     def on_run(self):
         self.make_command()
-        #subprocess.call(["screen", "-c", "run_command/.screenrc"])
         temp = tempfile.NamedTemporaryFile()
         name = temp.name
         with open(name, "wt") as fout:
@@ -247,8 +244,8 @@ class ContainerPane(Pane):
 
     def on_commit(self):
         widget, idx = self.listing.get_focus()
-        name, tag = split_repo_name(widget.tag)
-        prompt = Prompt(lambda name: self.perform_tag(widget.container, name), title="Tag Container:", initial=name)
+        name, tag = split_repo_name(widget.image)
+        prompt = Prompt(lambda name: self.perform_commit(widget.container, name), title="Tag Container:", initial=name)
         self.show_dialog(prompt)
 
     @catch_docker_errors
