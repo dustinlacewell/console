@@ -182,21 +182,23 @@ class ContainerPane(Pane):
                 return True
         return False
 
-    def get_Id(self):
-        widget, idx = self.listing.get_focus()
-        info = app.client.inspect_container(widget.container)
-        id = info['Id']
-        return id
-    
     def make_command(self):
         row = 0
-        for k, v in self.marked_ids.items():
+        none_marked = True
+        for k, v in self.marked_containers.items():
             if v == "marked":
-                self.commands += "screen %d docker exec -it %s bash\n" % (row, k)
+                self.commands += "screen %d docker exec -it %s bash\n" % (row, k.container)
+                self.commands += "title %s\n" % k.image
                 row += 1
+                none_marked = False
+        self.commands += "caption always\n"
+        if none_marked or len(self.marked_containers) == 0:
+            widget, idx = self.listing.get_focus()
+            self.commands += "screen 0 docker exec -it %s bash\n" % widget.container
 
     def on_run(self):
         self.make_command()
+        print(self.commands)
         temp = tempfile.NamedTemporaryFile()
         name = temp.name
         with open(name, "wt") as fout:
@@ -212,13 +214,8 @@ class ContainerPane(Pane):
     def on_prev(self):
         self.listing.prev()
 
-    def get_widget(self):
-        widget, idx = self.listing.get_focus()
-        return widget
-
     def on_mark(self):
-        marked_widget = self.get_widget()
-        marked_id = self.get_Id()
+        marked_widget, marked_id = self.listing.get_focus()
         if (marked_widget in self.marked_containers and 
                 self.marked_containers[marked_widget] == "marked"):
             self.marked_containers[marked_widget] = "unmarked"
