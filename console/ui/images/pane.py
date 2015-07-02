@@ -183,11 +183,16 @@ class ImagePane(Pane):
         return d
 
     def delete_marked(self):
+        none_marked = True
         for key, value in self.marked_widgets.items():
             if value == "marked":
                 widget = key
                 self.on_delete(widget)
                 del self.marked_widgets[key]
+                none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.on_delete(widget)
 
     @catch_docker_errors
     def on_delete(self, widget):

@@ -38,6 +38,13 @@ class ContainersTab(Tab):
         'ctrl r': ('run-container(s)', 'run the selected container(s) in screen'), 
         'ctrl u': ('unmark-containers', 'unmark all selected containers'),
         'ctrl e': ('rename-container', 'rename the selected container'),
+        'ctrl f': ('inspect-changes', 'inspect changes on container filesystem'),
+        'ctrl g': ('restart-container', 'restart the selected container'),
+        'ctrl l': ('kill-container', 'kill the selected container'),
+        'ctrl x': ('pause-container', 'pause the selected container'),
+        'ctrl o': ('unpause-container', 'unpause the selected container'),
+        'ctrl w': ('start-container', 'start the selected container'),
+        'ctrl y': ('stop-container', 'stop the selected container'),
     }
 
     def get_content(self):

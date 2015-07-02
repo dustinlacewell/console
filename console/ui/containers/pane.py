@@ -14,7 +14,7 @@ from console.ui.containers.inspect import ContainerInspector
 from console.widgets.table import Table
 from console.highlights import highlighter
 from console.widgets.pane import Pane
-from console.widgets.dialogs import Prompt, MessageListBox
+from console.widgets.dialogs import Prompt, MessageListBox, TableDialog
 from console.utils import catch_docker_errors
 
 
@@ -109,7 +109,6 @@ class ContainerPane(Pane):
                     highlighter.apply(row, 'created', 'created')
                     reactor.callLater(1, highlighter.remove, row)
 
-
         for container in stopped:
             in_names = any(filter in name.lower() for name in container['names'])
             in_id = filter in container['id'].lower()
@@ -160,6 +159,20 @@ class ContainerPane(Pane):
             self.on_unmark()
         elif event == 'rename-container':
             self.on_rename()
+        elif event == 'inspect-changes':
+            self.on_diff()
+        elif event == 'restart-container':
+            self.on_restart()
+        elif event == 'kill-container':
+            self.on_kill()
+        elif event == 'pause-container':
+            self.on_pause()
+        elif event == 'unpause-container':
+            self.on_unpause()
+        elif event == 'start-container':
+            self.on_start()
+        elif event == 'stop-container':
+            self.on_stop()
         else:
             return super(ContainerPane, self).handle_event(event)
 
@@ -230,20 +243,107 @@ class ContainerPane(Pane):
         app.state.containers.all = not app.state.containers.all
     
     def dict_on_delete(self):
+        none_marked = True
         for key, value in self.marked_containers.items():
             if value == "marked":
                 widget = key
                 self.on_delete(widget)
                 del self.marked_containers[key]
+                none_marked = False
         for k, v in self.marked_ids.items():
             if v == "marked":
+                self.on_delete(k)
                 del self.marked_ids[k]
-    
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.on_delete(widget)
+
     @catch_docker_errors
     def on_delete(self, widget):
         highlighter.apply(widget, 'deleted', 'deleted')
         reactor.callLater(2.5, highlighter.remove, widget)
         return threads.deferToThread(app.client.remove_container, widget.container)
+
+    @catch_docker_errors
+    def perform_pause(self, widget):
+        return threads.deferToThread(app.client.pause, widget)
+        
+    def on_pause(self):
+        none_marked = True
+        if len(self.marked_ids) > 0:
+            for key, value in self.marked_ids.items():
+                if value == "marked":
+                    self.perform_pause(key)                
+                    none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.perform_pause(widget.container)
+        else:
+            self.on_unmark()
+
+    @catch_docker_errors
+    def perform_start(self, widget):
+        return threads.deferToThread(app.client.start, widget)
+
+    def on_start(self):
+        none_marked = True
+        for key, value in self.marked_ids.items():
+            if value == "marked":
+                self.perform_start(key)
+                none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.perform_start(widget.container)
+        else:
+            self.on_unmark()
+
+    @catch_docker_errors
+    def perform_stop(self, widget):
+        return threads.deferToThread(app.client.stop, widget)
+
+    def on_stop(self):
+        none_marked = True
+        for key, value in self.marked_ids.items():
+            if value == "marked":
+                self.perform_stop(key)
+                none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.perform_stop(widget.container)
+        else:
+            self.on_unmark()
+
+    @catch_docker_errors
+    def perform_unpause(self, widget):
+        return threads.deferToThread(app.client.unpause, widget)
+
+    def on_unpause(self):
+        none_marked = True
+        for key, value in self.marked_ids.items():
+            if value == "marked":
+                self.perform_unpause(key)
+                none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.perform_unpause(widget.container)
+        else:
+            self.on_unmark()
+    
+    @catch_docker_errors
+    def perform_kill(self, widget):
+        return threads.deferToThread(app.client.kill, widget)
+
+    def on_kill(self):
+        none_marked = True
+        for key, value in self.marked_ids.items():
+            if value == "marked":
+                self.perform_kill(key)
+                none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.perform_kill(widget.container)
+        else:
+            self.on_unmark()
 
     @catch_docker_errors
     def perform_commit(self, container, repo_name):
@@ -257,6 +357,22 @@ class ContainerPane(Pane):
         name, tag = split_repo_name(widget.image)
         prompt = Prompt(lambda name: self.perform_commit(widget.container, name), title="Tag Container:", initial=name)
         self.show_dialog(prompt)
+
+    @catch_docker_errors
+    def perform_restart(self, widget):
+        return threads.deferToThread(app.client.restart, widget)
+
+    def on_restart(self):
+        none_marked = True
+        for key, value in self.marked_ids.items():
+            if value == "marked":
+                self.perform_restart(key)
+                none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.perform_restart(widget.container)
+        else:
+            self.on_unmark()
 
     @catch_docker_errors
     def perform_rename(self, container, name):
@@ -276,3 +392,30 @@ class ContainerPane(Pane):
         d.addCallback(lambda data: self.show_dialog(ContainerInspector(data)))
         return d
 
+    def _show_diff(self, diff_json, container_id):
+        for d in diff_json:
+            if d['Kind'] == 0:
+                d['Kind'] = 'Change'
+            elif d['Kind'] == 1:
+                d['Kind'] = 'Add'
+            elif d['Kind'] == 2:
+                d['Kind'] = 'Delete'
+        diffs = [(d.get('Kind',''), d.get('Path','')) for d in diff_json]
+        dialog = TableDialog(
+            "Changes in %s" % container_id[:12],
+            diffs,
+            [
+                {'value':"kind", 'weight':1, 'align':'center'},
+                {'value':"path", 'weight':4, 'align':'center'}
+            ]
+        )
+        dialog.width = ('relative', 90)
+        self.show_dialog(dialog, )
+
+    @catch_docker_errors
+    def on_diff(self):
+        widget, idx = self.listing.get_focus()
+        d = threads.deferToThread(app.client.diff, widget.container)
+        d.addCallback(self._show_diff, widget.container)
+        d.addCallback(lambda r: app.draw_screen())
+        return d
