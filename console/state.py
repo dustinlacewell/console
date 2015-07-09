@@ -2,6 +2,7 @@ from datetime import datetime
 
 import docker
 import urwid
+import sys
 
 from twisted.internet import reactor, threads
 
@@ -11,6 +12,7 @@ class ContainerMonitor(object):
         self.frequency = frequency
         self.all = False
         urwid.register_signal(ContainerMonitor, 'container-list')
+        self.x = 1
 
     def process_containers(self, container_data):
         containers = []
@@ -34,14 +36,16 @@ class ContainerMonitor(object):
         return containers
 
     def get_containers(self):
+        self.x = self.x + 1
+        if self.x % 3 == 0: return
         d = threads.deferToThread(self.client.containers, all=self.all)
         d.addCallback(self.process_containers)
         d.addCallback(self.emit_containers)
         return d
 
-
 class ImageMonitor(object):
     def __init__(self, client, frequency=1, all=False):
+        self.y = 1
         self.client = client
         self.frequency = frequency
         self.all = False
@@ -70,6 +74,8 @@ class ImageMonitor(object):
         return images
 
     def get_images(self):
+        self.y = self.y + 1
+        if self.y % 3 == 0: return
         d = threads.deferToThread(self.client.images, all=self.all)
         d.addCallback(self.process_images)
         d.addCallback(self.emit_images)
@@ -77,14 +83,11 @@ class ImageMonitor(object):
 
 
 class DockerState(object):
-
     def __init__(self, host, version, frequency):
         self.host = host
         self.version = version
         self.client = docker.Client(base_url=host, version=version)
         self.frequency = frequency
         self.images = ImageMonitor(self.client)
-        self.images.get_images()
         self.containers = ContainerMonitor(self.client)
-        self.containers.get_containers()
 

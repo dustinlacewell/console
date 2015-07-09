@@ -6,6 +6,8 @@ import urwid
 import subprocess
 import os
 import tempfile
+import sys
+import time
 
 from twisted.internet import threads, reactor
 
@@ -16,7 +18,7 @@ from console.highlights import highlighter
 from console.widgets.pane import Pane
 from console.widgets.dialogs import Prompt, MessageListBox, TableDialog
 from console.utils import catch_docker_errors
-
+from console.state import ContainerMonitor, ImageMonitor
 
 def split_repo_name(name):
     for idx in range(len(name)):
@@ -38,6 +40,8 @@ class AlwaysFocusedEdit(urwid.Edit):
 
 class ContainerPane(Pane):
     def __init__(self):
+        self.monitored = ContainerMonitor(docker.Client('unix://var/run/docker.sock', '1.18'))
+        self.monitored.get_containers()
         self.container_data = []
         self.containers = {}
         self.edit = AlwaysFocusedEdit("filter: ", multiline=False)
@@ -52,8 +56,8 @@ class ContainerPane(Pane):
             self.edit,
         ))
         self.original_widget.focus_position = 'body'
-        urwid.connect_signal(app.state.containers, 'container-list', self.set_containers)
-
+        urwid.connect_signal(self.monitored, 'container-list', self.set_containers)
+    
     def init_listing(self):
         schema = (
             {'name': 'Id'},
@@ -145,33 +149,44 @@ class ContainerPane(Pane):
             self.on_prev()
         elif event == 'toggle-show-all':
             self.on_all()
+            self.monitored.get_containers()
         elif event == 'delete-container':
+            self.monitored.get_containers()
             self.dict_on_delete()
         elif event == 'commit-container':
+            self.monitored.get_containers()
             self.on_commit()
         elif event == 'inspect-details':
             self.on_inspect()
         elif event == 'set-mark':
             self.on_mark()
-        elif event == 'run-container(s)' and self.marked_exists():
+        elif event == ('run-container(s)' and 
+                self.marked_exists() and not self.monitored.all):
             self.on_run()
         elif event == 'unmark-containers':
             self.on_unmark()
         elif event == 'rename-container':
             self.on_rename()
+            self.monitored.get_containers()
         elif event == 'inspect-changes':
             self.on_diff()
         elif event == 'restart-container':
+            self.monitored.get_containers()
             self.on_restart()
         elif event == 'kill-container':
+            self.monitored.get_containers()
             self.on_kill()
         elif event == 'pause-container':
+            self.monitored.get_containers()
             self.on_pause()
         elif event == 'unpause-container':
+            self.monitored.get_containers()
             self.on_unpause()
         elif event == 'start-container':
+            self.monitored.get_containers()
             self.on_start()
         elif event == 'stop-container':
+            self.monitored.get_containers()
             self.on_stop()
         else:
             return super(ContainerPane, self).handle_event(event)
@@ -192,13 +207,9 @@ class ContainerPane(Pane):
                 row += 1
                 none_marked = False
         self.commands += "caption always\n"
-        if none_marked or len(self.marked_containers) == 0:
-            widget, idx = self.listing.get_focus()
-            self.commands += "screen 0 docker exec -it %s bash\n" % widget.container
 
     def on_run(self):
         self.make_command()
-        print(self.commands)
         temp = tempfile.NamedTemporaryFile()
         name = temp.name
         with open(name, "wt") as fout:
@@ -237,7 +248,7 @@ class ContainerPane(Pane):
 
     def on_all(self):
         self.on_unmark()
-        app.state.containers.all = not app.state.containers.all
+        self.monitored.all = not self.monitored.all
     
     def dict_on_delete(self):
         none_marked = True

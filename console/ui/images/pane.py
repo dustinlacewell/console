@@ -2,6 +2,7 @@ import urwid
 
 import os
 import json
+import docker
 
 from twisted.internet import threads, reactor
 
@@ -13,9 +14,12 @@ from console.highlights import highlighter
 from console.widgets.pane import Pane
 from console.widgets.dialogs import Prompt, MessageListBox, TableDialog
 from console.utils import catch_docker_errors, split_repo_name
+from console.state import ImageMonitor
 
 class ImagePane(Pane):
     def __init__(self):
+        self.monitored = ImageMonitor(docker.Client('unix://var/run/docker.sock', '1.18'))
+        self.monitored.get_images()
         self.image_data = []
         self.images = {}
         self.edit = AlwaysFocusedEdit("filter: ", multiline=False)
@@ -27,7 +31,7 @@ class ImagePane(Pane):
             self.edit,
         ))
         self.original_widget.focus_position = 'body'
-        urwid.connect_signal(app.state.images, 'image-list', self.set_images)
+        urwid.connect_signal(self.monitored, 'image-list', self.set_images)
 
     def init_listing(self):
         schema = (
@@ -112,23 +116,28 @@ class ImagePane(Pane):
             self.on_prev()
         elif event == 'toggle-show-all':
             self.on_all()
+            self.monitored.get_images()
         elif event == 'delete-image':
+            self.monitored.get_images()
             self.delete_marked()
         elif event == 'tag-image':
             self.on_tag()
+            self.monitored.get_images()
         elif event == 'inspect-details':
             self.on_inspect()
         elif event == 'help':
             self.on_help()
-        elif event == 'set-mark' and not app.state.images.all:
+        elif event == 'set-mark' and not self.monitored.all:
             self.on_marked()
         elif event == 'unmark-images':
             self.on_unmark()
         elif event == 'view-history':
             self.on_history()
         elif event == 'push-image':
+            self.monitored.get_images()
             self.push()
         else:
+            self.monitored.get_images()
             return super(ImagePane, self).handle_event(event)
 
     def on_next(self):
@@ -138,7 +147,7 @@ class ImagePane(Pane):
         self.listing.prev()
 
     def on_all(self):
-        app.state.images.all = not app.state.images.all
+        self.monitored.all = not self.monitored.all
 
     def get_widget(self):
         widget, idx = self.listing.get_focus()
@@ -227,6 +236,7 @@ class ImagePane(Pane):
         def handle_response(r):
             r = r.replace("}{", "},{")
             r = r.replace("1)\"}", "1)\"},")
+            r = r.replace("2)\"}", "2)\"},")
             r = "[%s]" % r
             messages = [d.get('status') or d.get('error') for d in json.loads(r)]
             self.show_dialog(MessageListBox(messages, title='Push Response', width=100))
