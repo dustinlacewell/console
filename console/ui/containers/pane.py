@@ -154,14 +154,12 @@ class ContainerPane(Pane):
             self.monitored.get_containers()
             self.dict_on_delete()
         elif event == 'commit-container':
-            self.monitored.get_containers()
             self.on_commit()
         elif event == 'inspect-details':
             self.on_inspect()
         elif event == 'set-mark':
             self.on_mark()
-        elif event == ('run-container(s)' and 
-                self.marked_exists() and not self.monitored.all):
+        elif event == 'run-container(s)' and not self.monitored.all:
             self.on_run()
         elif event == 'unmark-containers':
             self.on_unmark()
@@ -206,6 +204,10 @@ class ContainerPane(Pane):
                 self.commands += "title %s\n" % k.image
                 row += 1
                 none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.commands += "screen 0 docker exec -it %s bash\n" % widget.container
+            self.commands += "title %s\n" % widget.image
         self.commands += "caption always\n"
 
     def on_run(self):
@@ -260,7 +262,6 @@ class ContainerPane(Pane):
                 none_marked = False
         for k, v in self.marked_ids.items():
             if v == "marked":
-                self.on_delete(k)
                 del self.marked_ids[k]
         if none_marked:
             widget, idx = self.listing.get_focus()
