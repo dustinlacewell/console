@@ -81,7 +81,6 @@ class ImagePane(Pane):
                     highlighter.apply(row, 'created', 'created')
                     reactor.callLater(1, highlighter.remove, row)
 
-
         for image in untagged:
             in_tag = filter in image['tag'].lower()
             in_id = filter in image['id'].lower()

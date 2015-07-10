@@ -49,7 +49,6 @@ class ContainerPane(Pane):
         self.filter = ""
         self.commands = ""
         self.marked_containers = {}
-        self.marked_ids = {}
         self.marking_down = True
         Pane.__init__(self, urwid.Frame(
             self.listing,
@@ -189,12 +188,6 @@ class ContainerPane(Pane):
         else:
             return super(ContainerPane, self).handle_event(event)
 
-    def marked_exists(self):
-        for k, v in self.marked_ids.items():
-            if v == "marked":
-                return True
-        return False
-
     def make_command(self):
         row = 0
         none_marked = True
@@ -232,11 +225,9 @@ class ContainerPane(Pane):
         if (marked_widget in self.marked_containers and 
                 self.marked_containers[marked_widget] == "marked"):
             self.marked_containers[marked_widget] = "unmarked"
-            self.marked_ids[marked_id] = "unmarked"
             self.listing.unmark()
         else:
             self.marked_containers[marked_widget] = "marked"
-            self.marked_ids[marked_id] = "marked"
             self.listing.mark()
 
     def on_unmark(self):
@@ -244,9 +235,6 @@ class ContainerPane(Pane):
             if value == "marked":
                 self.marked_containers[key] = "unmarked"
                 key.set_attr_map({None:None})
-        for key, value in self.marked_ids.items():
-            if value == "marked":
-                self.marked_ids[key] = "unmarked"
 
     def on_all(self):
         self.on_unmark()
@@ -260,9 +248,6 @@ class ContainerPane(Pane):
                 self.on_delete(widget)
                 del self.marked_containers[key]
                 none_marked = False
-        for k, v in self.marked_ids.items():
-            if v == "marked":
-                del self.marked_ids[k]
         if none_marked:
             widget, idx = self.listing.get_focus()
             self.on_delete(widget)
@@ -274,31 +259,14 @@ class ContainerPane(Pane):
         return threads.deferToThread(app.client.remove_container, widget.container)
 
     @catch_docker_errors
-    def perform_pause(self, widget):
-        return threads.deferToThread(app.client.pause, widget)
-        
-    def on_pause(self):
-        none_marked = True
-        if len(self.marked_ids) > 0:
-            for key, value in self.marked_ids.items():
-                if value == "marked":
-                    self.perform_pause(key)                
-                    none_marked = False
-        if none_marked:
-            widget, idx = self.listing.get_focus()
-            self.perform_pause(widget.container)
-        else:
-            self.on_unmark()
-
-    @catch_docker_errors
     def perform_start(self, widget):
         return threads.deferToThread(app.client.start, widget)
 
     def on_start(self):
         none_marked = True
-        for key, value in self.marked_ids.items():
+        for key, value in self.marked_containers.items():
             if value == "marked":
-                self.perform_start(key)
+                self.perform_start(key.container)
                 none_marked = False
         if none_marked:
             widget, idx = self.listing.get_focus()
@@ -312,13 +280,30 @@ class ContainerPane(Pane):
 
     def on_stop(self):
         none_marked = True
-        for key, value in self.marked_ids.items():
+        for key, value in self.marked_containers.items():
             if value == "marked":
-                self.perform_stop(key)
+                self.perform_stop(key.container)
                 none_marked = False
         if none_marked:
             widget, idx = self.listing.get_focus()
             self.perform_stop(widget.container)
+        else:
+            self.on_unmark()
+
+    @catch_docker_errors
+    def perform_pause(self, widget):
+        return threads.deferToThread(app.client.pause, widget)
+        
+    def on_pause(self):
+        none_marked = True
+        if len(self.marked_containers) > 0:
+            for key, value in self.marked_containers.items():
+                if value == "marked":
+                    self.perform_pause(key.container)                
+                    none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            self.perform_pause(widget.container)
         else:
             self.on_unmark()
 
@@ -328,9 +313,9 @@ class ContainerPane(Pane):
 
     def on_unpause(self):
         none_marked = True
-        for key, value in self.marked_ids.items():
+        for key, value in self.marked_containers.items():
             if value == "marked":
-                self.perform_unpause(key)
+                self.perform_unpause(key.container)
                 none_marked = False
         if none_marked:
             widget, idx = self.listing.get_focus()
@@ -344,9 +329,9 @@ class ContainerPane(Pane):
 
     def on_kill(self):
         none_marked = True
-        for key, value in self.marked_ids.items():
+        for key, value in self.marked_containers.items():
             if value == "marked":
-                self.perform_kill(key)
+                self.perform_kill(key.container)
                 none_marked = False
         if none_marked:
             widget, idx = self.listing.get_focus()
@@ -373,9 +358,9 @@ class ContainerPane(Pane):
 
     def on_restart(self):
         none_marked = True
-        for key, value in self.marked_ids.items():
+        for key, value in self.marked_containers.items():
             if value == "marked":
-                self.perform_restart(key)
+                self.perform_restart(key.container)
                 none_marked = False
         if none_marked:
             widget, idx = self.listing.get_focus()
