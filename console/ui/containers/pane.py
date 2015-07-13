@@ -78,6 +78,7 @@ class ContainerPane(Pane):
         row.image = container['image']
         row.container = container['id']
         row.name = container['names']
+        row.status = container['status']
         self.containers[row.container] = row
         return row
 
@@ -158,7 +159,7 @@ class ContainerPane(Pane):
             self.on_inspect()
         elif event == 'set-mark':
             self.on_mark()
-        elif event == 'run-container(s)' and not self.monitored.all:
+        elif event == 'run-container(s)':
             self.on_run()
         elif event == 'unmark-containers':
             self.on_unmark()
@@ -192,13 +193,15 @@ class ContainerPane(Pane):
         row = 0
         none_marked = True
         for k, v in self.marked_containers.items():
-            if v == "marked":
+            if v == "marked" and 'Exited' not in k.status:
                 self.commands += "screen %d docker exec -it %s bash\n" % (row, k.container)
                 self.commands += "title %s\n" % k.image
                 row += 1
                 none_marked = False
         if none_marked:
             widget, idx = self.listing.get_focus()
+            if 'Exited' in widget.status:
+                return
             self.commands += "screen 0 docker exec -it %s bash\n" % widget.container
             self.commands += "title %s\n" % widget.image
         self.commands += "caption always\n"
@@ -209,6 +212,8 @@ class ContainerPane(Pane):
         name = temp.name
         with open(name, "wt") as fout:
             fout.write(self.commands)
+        if self.commands == "": 
+            return
         subprocess.call(["screen", "-c", "%s" % name])
         temp.close()
         app.client.close()
@@ -378,6 +383,7 @@ class ContainerPane(Pane):
         name = clean_name(widget.name[0])
         prompt = Prompt(lambda name: self.perform_rename(widget.container, name), title="Rename Container:", initial=name)
         self.show_dialog(prompt)
+        self.monitored.get_containers()
 
     @catch_docker_errors
     def on_inspect(self):

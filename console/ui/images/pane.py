@@ -126,7 +126,7 @@ class ImagePane(Pane):
             self.on_inspect()
         elif event == 'help':
             self.on_help()
-        elif event == 'set-mark' and not self.monitored.all:
+        elif event == 'set-mark':
             self.on_marked()
         elif event == 'unmark-images':
             self.on_unmark()
@@ -148,12 +148,8 @@ class ImagePane(Pane):
     def on_all(self):
         self.monitored.all = not self.monitored.all
 
-    def get_widget(self):
-        widget, idx = self.listing.get_focus()
-        return widget
-
     def on_marked(self):
-        marked_widget = self.get_widget()
+        marked_widget, idx = self.listing.get_focus()
         if (marked_widget in self.marked_widgets and 
                 self.marked_widgets[marked_widget] == "marked"):
             self.marked_widgets[marked_widget] = "unmarked"
@@ -193,14 +189,15 @@ class ImagePane(Pane):
     def delete_marked(self):
         none_marked = True
         for key, value in self.marked_widgets.items():
-            if value == "marked":
+            if value == "marked" and key.tag != '<none>:<none>':
                 widget = key
                 self.on_delete(widget)
                 del self.marked_widgets[key]
                 none_marked = False
         if none_marked:
             widget, idx = self.listing.get_focus()
-            self.on_delete(widget)
+            if widget.tag != '<none>:<none>':
+                self.on_delete(widget)
 
     @catch_docker_errors
     def on_delete(self, widget):
