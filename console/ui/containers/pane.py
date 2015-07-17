@@ -50,6 +50,9 @@ class ContainerPane(Pane):
         self.commands = ""
         self.marked_containers = {}
         self.marking_down = True
+        self.in_inspect = False
+        self.in_diff = False
+        self.size = ()
         Pane.__init__(self, urwid.Frame(
             self.listing,
             self.edit,
@@ -131,6 +134,14 @@ class ContainerPane(Pane):
         app.draw_screen()
 
     def keypress(self, size, event):
+        self.size = size
+        if event == 'close-dialog':
+            if self.in_inspect:
+                self.in_inspect = False
+            if self.in_diff:
+                self.in_diff = False
+        if event == 'scroll-close':
+            event = 'close-dialog'
         if self.dialog:
             return super(ContainerPane, self).keypress(size, event)
 
@@ -141,12 +152,25 @@ class ContainerPane(Pane):
                 else:
                     self.filter = self.edit.edit_text
                     self.set_containers(self.container_data, force=True)
+                    self.on_unmark()
 
     def handle_event(self, event):
         if event == 'next-container':
             self.on_next()
+            if self.in_inspect or self.in_diff:
+                self.keypress(self.size, 'scroll-close')
+                if self.in_inspect:
+                    self.on_inspect()
+                if self.in_diff:
+                    self.on_diff()
         elif event == 'prev-container':
             self.on_prev()
+            if self.in_inspect or self.in_diff:
+                self.keypress(self.size, 'scroll-close')
+                if self.in_inspect:
+                    self.on_inspect()
+                if self.in_diff:
+                    self.on_diff()
         elif event == 'toggle-show-all':
             self.on_all()
             self.monitored.get_containers()
@@ -156,6 +180,7 @@ class ContainerPane(Pane):
         elif event == 'commit-container':
             self.on_commit()
         elif event == 'inspect-details':
+            self.in_inspect = True
             self.on_inspect()
         elif event == 'set-mark':
             self.on_mark()
@@ -167,6 +192,7 @@ class ContainerPane(Pane):
             self.on_rename()
             self.monitored.get_containers()
         elif event == 'inspect-changes':
+            self.in_diff = True
             self.on_diff()
         elif event == 'restart-container':
             self.monitored.get_containers()
@@ -189,7 +215,7 @@ class ContainerPane(Pane):
         else:
             return super(ContainerPane, self).handle_event(event)
 
-    def make_command(self):
+    def make_screen_command(self):
         row = 0
         none_marked = True
         for k, v in self.marked_containers.items():
@@ -205,19 +231,58 @@ class ContainerPane(Pane):
             self.commands += "screen 0 docker exec -it %s bash\n" % widget.container
             self.commands += "title %s\n" % widget.image
         self.commands += "caption always\n"
-
-    def on_run(self):
-        self.make_command()
         temp = tempfile.NamedTemporaryFile()
         name = temp.name
         with open(name, "wt") as fout:
             fout.write(self.commands)
-        if self.commands == "": 
+        if self.commands == "":
             return
-        subprocess.call(["screen", "-c", "%s" % name])
+        subprocess.call(["screen", "-c" "%s" % name])
         temp.close()
         app.client.close()
         raise urwid.ExitMainLoop
+
+    def make_tmux_command(self):
+        self.commands += "#!/bin/bash\n"
+        self.commands += "tmux new-session -d -s run-containers\n"
+        row = 1
+        none_marked = True
+        for k, v in self.marked_containers.items():
+            if v == "marked" and 'Exited' not in k.status:
+                self.commands += "tmux new-window -t run-containers:%d -n '%s' 'docker exec -it %s bash'\n" % (row, k.image, k.container)
+                row += 1
+                none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            if 'Exited' in widget.status:
+                return
+            self.commands += "tmux new-window -t run-containers:1 -n '%s' 'docker exec -it %s bash'\n" % (widget.image, widget.container)
+        self.commands += "tmux select-window -t run-containers:1\n"
+        self.commands += "tmux -2 attach-session -t run-containers\n"
+
+        temp = tempfile.NamedTemporaryFile()
+        name = temp.name
+        with open(name, "wt") as fout:
+            fout.write(self.commands)
+        if self.commands == "":
+            return
+        subprocess.call(["rbash", "%s" % name])
+        temp.close()
+        app.client.close()
+        raise urwid.ExitMainLoop
+
+    def make_command(self, which_mux):
+        if which_mux == "screen":
+            self.make_screen_command()
+        elif which_mux == "tmux":
+            self.make_tmux_command()
+        else:
+            self.on_run()
+
+    def on_run(self):
+        which_mux = "Delete this and type screen or tmux"
+        prompt = Prompt(lambda which_mux: self.make_command(which_mux), title="Run Container:", initial=which_mux)
+        self.show_dialog(prompt)
 
     def on_next(self):
         self.listing.next()
@@ -229,7 +294,7 @@ class ContainerPane(Pane):
         marked_widget, marked_id = self.listing.get_focus()
         if (marked_widget in self.marked_containers and 
                 self.marked_containers[marked_widget] == "marked"):
-            self.marked_containers[marked_widget] = "unmarked"
+            del self.marked_containers[marked_widget]
             self.listing.unmark()
         else:
             self.marked_containers[marked_widget] = "marked"
@@ -238,8 +303,8 @@ class ContainerPane(Pane):
     def on_unmark(self):
         for key, value in self.marked_containers.items():
             if value == "marked":
-                self.marked_containers[key] = "unmarked"
                 key.set_attr_map({None:None})
+                del self.marked_containers[key]
 
     def on_all(self):
         self.on_unmark()

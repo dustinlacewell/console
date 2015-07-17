@@ -12,7 +12,7 @@ class ContainerMonitor(object):
         self.frequency = frequency
         self.all = False
         urwid.register_signal(ContainerMonitor, 'container-list')
-        self.x = 1
+        self.get_count = 1
 
     def process_containers(self, container_data):
         containers = []
@@ -36,8 +36,8 @@ class ContainerMonitor(object):
         return containers
 
     def get_containers(self):
-        self.x = self.x + 1
-        if self.x % 3 == 0: return
+        self.get_count = self.get_count + 1
+        if self.get_count % 3 == 0: return
         d = threads.deferToThread(self.client.containers, all=self.all)
         d.addCallback(self.process_containers)
         d.addCallback(self.emit_containers)
@@ -45,7 +45,7 @@ class ContainerMonitor(object):
 
 class ImageMonitor(object):
     def __init__(self, client, frequency=1, all=False):
-        self.y = 1
+        self.get_count = 1
         self.client = client
         self.frequency = frequency
         self.all = False
@@ -74,8 +74,8 @@ class ImageMonitor(object):
         return images
 
     def get_images(self):
-        self.y = self.y + 1
-        if self.y % 3 == 0: return
+        self.get_count = self.get_count + 1
+        if self.get_count % 3 == 0: return
         d = threads.deferToThread(self.client.images, all=self.all)
         d.addCallback(self.process_images)
         d.addCallback(self.emit_images)

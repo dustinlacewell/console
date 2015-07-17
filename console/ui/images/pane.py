@@ -26,6 +26,9 @@ class ImagePane(Pane):
         self.listing = self.init_listing()
         self.filter = ""
         self.marked_widgets = {}
+        self.in_history = False
+        self.in_inspect = False
+        self.size = ()
         Pane.__init__(self, urwid.Frame(
             self.listing,
             self.edit,
@@ -97,6 +100,14 @@ class ImagePane(Pane):
         app.draw_screen()
 
     def keypress(self, size, event):
+        self.size = size
+        if event == 'close-dialog':
+            if self.in_history:
+                self.in_history = False
+            if self.in_inspect:
+                self.in_inspect = False
+        if event == 'scroll-close':
+            event = 'close-dialog'
         if self.dialog:
             return super(ImagePane, self).keypress(size, event)
 
@@ -108,11 +119,24 @@ class ImagePane(Pane):
                     self.filter = self.edit.edit_text
                     self.set_images(self.image_data, force=True)
 
+
     def handle_event(self, event):
         if event == 'next-image':
             self.on_next()
+            if self.in_history or self.in_inspect:
+                self.keypress(self.size, 'scroll-close')
+                if self.in_history:
+                    self.on_history()
+                if self.in_inspect:
+                    self.on_inspect()
         elif event == 'prev-image':
             self.on_prev()
+            if self.in_history or self.in_inspect:
+                self.keypress(self.size, 'scroll-close')
+                if self.in_history:
+                    self.on_history()
+                if self.in_inspect:
+                    self.on_inspect()
         elif event == 'toggle-show-all':
             self.on_all()
             self.monitored.get_images()
@@ -123,6 +147,7 @@ class ImagePane(Pane):
             self.on_tag()
             self.monitored.get_images()
         elif event == 'inspect-details':
+            self.in_inspect = True
             self.on_inspect()
         elif event == 'help':
             self.on_help()
@@ -131,6 +156,7 @@ class ImagePane(Pane):
         elif event == 'unmark-images':
             self.on_unmark()
         elif event == 'view-history':
+            self.in_history = True
             self.on_history()
         elif event == 'push-image':
             self.monitored.get_images()
