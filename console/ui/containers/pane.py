@@ -259,7 +259,6 @@ class ContainerPane(Pane):
             self.commands += "tmux new-window -t run-containers:1 -n '%s' 'docker exec -it %s bash'\n" % (widget.image, widget.container)
         self.commands += "tmux select-window -t run-containers:1\n"
         self.commands += "tmux -2 attach-session -t run-containers\n"
-
         temp = tempfile.NamedTemporaryFile()
         name = temp.name
         with open(name, "wt") as fout:
@@ -272,15 +271,17 @@ class ContainerPane(Pane):
         raise urwid.ExitMainLoop
 
     def make_command(self, which_mux):
-        if which_mux == "screen":
+        if (which_mux == "screen" or which_mux == "tmux or screen?: screen"
+                or which_mux == "tmux or screen?:screen"):
             self.make_screen_command()
-        elif which_mux == "tmux":
+        elif (which_mux == "tmux" or which_mux == "tmux or screen?: tmux"
+                or which_mux == "tmux or screen?:tmux"):
             self.make_tmux_command()
         else:
             self.on_run()
 
     def on_run(self):
-        which_mux = "Delete this and type screen or tmux"
+        which_mux = "tmux or screen?: "
         prompt = Prompt(lambda which_mux: self.make_command(which_mux), title="Run Container:", initial=which_mux)
         self.show_dialog(prompt)
 
