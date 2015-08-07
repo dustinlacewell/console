@@ -223,6 +223,8 @@ class ContainerPane(Pane):
             self.on_start()
         elif event == 'stop-container':
             self.on_stop()
+        elif event == 'top':
+            self.on_top()
         else:
             return super(ContainerPane, self).handle_event(event)
 
@@ -496,6 +498,18 @@ class ContainerPane(Pane):
         d.addCallback(self._show_diff, widget.container)
         d.addCallback(lambda r: app.draw_screen())
         return d
+
+#    def _show_top(self, top_json, container_id):
+#        print top_json
+#
+#    @catch_docker_errors
+#    def on_top(self):
+#        print "top"
+#        widget, idx = self.listing.get_focus()
+#        d = threads.deferToThread(app.client.top, widget.container)
+#        d.addCallback(self._show_top, widget.container)
+##        d.addCallback(lambda r: app.draw_screen())
+#        return d
 
     def listener(self):
         s = socket.socket(socket.AF_UNIX)

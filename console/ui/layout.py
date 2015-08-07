@@ -19,6 +19,7 @@ class ImagesTab(Tab):
         'ctrl v': ('inspect-details', 'inspect the selected image'),
         'ctrl k': ('set-mark', 'select current image'),
         'ctrl u': ('unmark-images', 'unmark all selected images'),
+        'ctrl l': ('pull-image', 'pull image from repository'),
     }
 
     def get_content(self):
@@ -45,6 +46,7 @@ class ContainersTab(Tab):
         'ctrl o': ('unpause-container', 'unpause the selected container'),
         'ctrl w': ('start-container', 'start the selected container'),
         'ctrl y': ('stop-container', 'stop the selected container'),
+        '  ': ('top-container', 'display running processes'),
     }
 
     def get_content(self):

@@ -155,11 +155,9 @@ class ImagePane(Pane):
             self.on_all()
             self.monitored.get_images()
         elif event == 'delete-image':
-            self.monitored.get_images()
             self.delete_marked()
         elif event == 'tag-image':
             self.on_tag()
-            self.monitored.get_images()
         elif event == 'inspect-details':
             self.in_inspect = True
             self.on_inspect()
@@ -175,6 +173,9 @@ class ImagePane(Pane):
         elif event == 'push-image':
             self.monitored.get_images()
             self.push()
+        elif event == 'pull-image':
+            self.pull()
+            self.monitored.get_images()
         else:
             self.monitored.get_images()
             return super(ImagePane, self).handle_event(event)
@@ -280,7 +281,18 @@ class ImagePane(Pane):
 
         d.addCallback(handle_response)
         return d
-    
+
+    @catch_docker_errors
+    def perform_pull(self, repo_name):
+        name, tag = split_repo_name(repo_name)
+        self.close_dialog()
+        return threads.deferToThread(app.client.pull, name, tag or 'latest')
+
+    def pull(self):
+        repo_name = ''
+        prompt = Prompt(lambda repo_name: self.perform_pull(repo_name), title="Pull Repository", initial=repo_name)
+        self.show_dialog(prompt)
+
     @catch_docker_errors
     def on_inspect(self):
         widget, idx = self.listing.get_focus()
