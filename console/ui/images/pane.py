@@ -3,7 +3,11 @@ import urwid
 import os
 import json
 import docker
+import threading
+import socket
+import time
 
+from contextlib import closing
 from twisted.internet import threads, reactor
 
 from console.app import app
@@ -99,8 +103,12 @@ class ImagePane(Pane):
         self.listing.fix_focus()
         app.draw_screen()
 
+    def thread(self):
+        return True
+
     def keypress(self, size, event):
         self.size = size
+        self.since_time = time.time()
         if event == 'close-dialog':
             if self.in_history:
                 self.in_history = False
@@ -118,7 +126,13 @@ class ImagePane(Pane):
                 else:
                     self.filter = self.edit.edit_text
                     self.set_images(self.image_data, force=True)
-
+        
+        if event not in ['next-image', 'prev-image', 'set-mark', 'unmark-images']:
+            thread = threading.Thread(target=self.thread)
+            listener = threading.Thread(target=self.listener)
+            listener.setDaemon(True)
+            listener.start()
+            thread.start()
 
     def handle_event(self, event):
         if event == 'next-image':
@@ -273,3 +287,12 @@ class ImagePane(Pane):
         d = threads.deferToThread(app.client.inspect_image, widget.image)
         d.addCallback(lambda data: self.show_dialog(ImageInspector(data)))
         return d
+
+    def listener(self):
+        s = socket.socket(socket.AF_UNIX)
+        s.connect('/var/run/docker.sock')
+        with closing(s):
+            s.sendall(b'GET /events?since=%d HTTP/1.1\n\n' % self.since_time)
+            header = s.recv(4096)
+            chunk = s.recv(4096)
+            self.monitored.get_images()

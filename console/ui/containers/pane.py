@@ -8,7 +8,13 @@ import os
 import tempfile
 import sys
 import time
+import ast
+import socket
+import threading
+import logging
+import multiprocessing
 
+from contextlib import closing
 from twisted.internet import threads, reactor
 
 from console.app import app
@@ -59,6 +65,7 @@ class ContainerPane(Pane):
         ))
         self.original_widget.focus_position = 'body'
         urwid.connect_signal(self.monitored, 'container-list', self.set_containers)
+        self.counter = 1
     
     def init_listing(self):
         schema = (
@@ -133,8 +140,12 @@ class ContainerPane(Pane):
         self.listing.fix_focus()
         app.draw_screen()
 
+    def thread(self):
+        return True
+
     def keypress(self, size, event):
         self.size = size
+        self.since_time = time.time()
         if event == 'close-dialog':
             if self.in_inspect:
                 self.in_inspect = False
@@ -154,6 +165,13 @@ class ContainerPane(Pane):
                     self.set_containers(self.container_data, force=True)
                     self.on_unmark()
 
+        if event not in ['next-container', 'prev-container', 'set-mark', 'unmark-containers']:
+            thread = threading.Thread(name='thread', target=self.thread)
+            listener = threading.Thread(name='listener', target=self.listener)
+            listener.setDaemon(True)
+            listener.start()
+            thread.start()
+
     def handle_event(self, event):
         if event == 'next-container':
             self.on_next()
@@ -163,7 +181,7 @@ class ContainerPane(Pane):
                     self.on_inspect()
                 if self.in_diff:
                     self.on_diff()
-        elif event == 'prev-container':
+        elif event== 'prev-container':
             self.on_prev()
             if self.in_inspect or self.in_diff:
                 self.keypress(self.size, 'scroll-close')
@@ -175,7 +193,6 @@ class ContainerPane(Pane):
             self.on_all()
             self.monitored.get_containers()
         elif event == 'delete-container':
-            self.monitored.get_containers()
             self.dict_on_delete()
         elif event == 'commit-container':
             self.on_commit()
@@ -195,22 +212,16 @@ class ContainerPane(Pane):
             self.in_diff = True
             self.on_diff()
         elif event == 'restart-container':
-            self.monitored.get_containers()
             self.on_restart()
         elif event == 'kill-container':
-            self.monitored.get_containers()
             self.on_kill()
         elif event == 'pause-container':
-            self.monitored.get_containers()
             self.on_pause()
         elif event == 'unpause-container':
-            self.monitored.get_containers()
             self.on_unpause()
         elif event == 'start-container':
-            self.monitored.get_containers()
             self.on_start()
         elif event == 'stop-container':
-            self.monitored.get_containers()
             self.on_stop()
         else:
             return super(ContainerPane, self).handle_event(event)
@@ -485,3 +496,13 @@ class ContainerPane(Pane):
         d.addCallback(self._show_diff, widget.container)
         d.addCallback(lambda r: app.draw_screen())
         return d
+
+    def listener(self):
+        s = socket.socket(socket.AF_UNIX)
+        s.connect('/var/run/docker.sock')
+        with closing(s):
+            s.sendall(b'GET /events?since=%d HTTP/1.1\n\n' % self.since_time)
+            header = s.recv(4096)
+            chunk2 = s.recv(4096)
+            self.monitored.get_containers()
+

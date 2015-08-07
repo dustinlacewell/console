@@ -3,6 +3,7 @@ from datetime import datetime
 import docker
 import urwid
 import sys
+import time
 
 from twisted.internet import reactor, threads
 
@@ -13,6 +14,7 @@ class ContainerMonitor(object):
         self.all = False
         urwid.register_signal(ContainerMonitor, 'container-list')
         self.get_count = 1
+        self.end_get = 0
 
     def process_containers(self, container_data):
         containers = []
@@ -37,7 +39,8 @@ class ContainerMonitor(object):
 
     def get_containers(self):
         self.get_count = self.get_count + 1
-        if self.get_count % 3 == 0: return
+        if self.get_count % 3 == 0: 
+            return
         d = threads.deferToThread(self.client.containers, all=self.all)
         d.addCallback(self.process_containers)
         d.addCallback(self.emit_containers)
