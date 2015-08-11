@@ -46,7 +46,7 @@ class ContainersTab(Tab):
         'ctrl o': ('unpause-container', 'unpause the selected container'),
         'ctrl w': ('start-container', 'start the selected container'),
         'ctrl y': ('stop-container', 'stop the selected container'),
-        '  ': ('top-container', 'display running processes'),
+        'shift tab': ('top-container', 'display running processes'),
     }
 
     def get_content(self):

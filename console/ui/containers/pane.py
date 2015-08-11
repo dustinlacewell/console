@@ -58,6 +58,7 @@ class ContainerPane(Pane):
         self.marking_down = True
         self.in_inspect = False
         self.in_diff = False
+        self.in_top = False
         self.size = ()
         Pane.__init__(self, urwid.Frame(
             self.listing,
@@ -151,6 +152,8 @@ class ContainerPane(Pane):
                 self.in_inspect = False
             if self.in_diff:
                 self.in_diff = False
+            if self.in_top:
+                self.in_top = False
         if event == 'scroll-close':
             event = 'close-dialog'
         if self.dialog:
@@ -175,20 +178,24 @@ class ContainerPane(Pane):
     def handle_event(self, event):
         if event == 'next-container':
             self.on_next()
-            if self.in_inspect or self.in_diff:
+            if self.in_inspect or self.in_diff or self.in_top:
                 self.keypress(self.size, 'scroll-close')
                 if self.in_inspect:
                     self.on_inspect()
                 if self.in_diff:
                     self.on_diff()
+                if self.in_top:
+                    self.on_top()
         elif event== 'prev-container':
             self.on_prev()
-            if self.in_inspect or self.in_diff:
+            if self.in_inspect or self.in_diff or self.in_top:
                 self.keypress(self.size, 'scroll-close')
                 if self.in_inspect:
                     self.on_inspect()
                 if self.in_diff:
                     self.on_diff()
+                if self.in_top:
+                    self.on_top()
         elif event == 'toggle-show-all':
             self.on_all()
             self.monitored.get_containers()
@@ -223,7 +230,8 @@ class ContainerPane(Pane):
             self.on_start()
         elif event == 'stop-container':
             self.on_stop()
-        elif event == 'top':
+        elif event == 'top-container':
+            self.in_top = True
             self.on_top()
         else:
             return super(ContainerPane, self).handle_event(event)
@@ -499,17 +507,33 @@ class ContainerPane(Pane):
         d.addCallback(lambda r: app.draw_screen())
         return d
 
-#    def _show_top(self, top_json, container_id):
-#        print top_json
-#
-#    @catch_docker_errors
-#    def on_top(self):
-#        print "top"
-#        widget, idx = self.listing.get_focus()
-#        d = threads.deferToThread(app.client.top, widget.container)
-#        d.addCallback(self._show_top, widget.container)
-##        d.addCallback(lambda r: app.draw_screen())
-#        return d
+    def _show_top(self, top_json, container_id):
+        processes = top_json.get('Processes','')
+        titles = top_json.get('Titles','')
+        dialog = TableDialog(
+            "Running Processes in %s" % container_id[:12],
+            processes,
+            [
+                {'value':titles[0], 'weight':3, 'align':'center'},
+                {'value':titles[1], 'weight':3, 'align':'center'},
+                {'value':titles[2], 'weight':3, 'align':'center'},
+                {'value':titles[3], 'weight':1, 'align':'center'},
+                {'value':titles[4], 'weight':3, 'align':'center'},
+                {'value':titles[5], 'weight':3, 'align':'center'},
+                {'value':titles[6], 'weight':3, 'align':'center'},
+                {'value':titles[7], 'weight':10, 'align':'center'},
+            ]
+        )
+        dialog.width = ('relative', 90)
+        self.show_dialog(dialog, )
+
+    @catch_docker_errors
+    def on_top(self):
+        widget, idx = self.listing.get_focus()
+        d = threads.deferToThread(app.client.top, widget.container)
+        d.addCallback(self._show_top, widget.container)
+        d.addCallback(lambda r: app.draw_screen())
+        return d
 
     def listener(self):
         s = socket.socket(socket.AF_UNIX)
