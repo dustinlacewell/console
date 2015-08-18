@@ -260,7 +260,7 @@ class ImagePane(Pane):
     def on_tag(self):
         widget, idx = self.listing.get_focus()
         name, tag = split_repo_name(widget.tag)
-        prompt = Prompt(lambda name: self.perform_tag(widget.image, name), title="Tag Image:", initial=name)
+        prompt = Prompt(lambda name: self.perform_tag(widget.image, name), title="Tag Image", initial=name)
         self.show_dialog(prompt)
 
     @catch_docker_errors
@@ -308,3 +308,4 @@ class ImagePane(Pane):
             header = s.recv(4096)
             chunk = s.recv(4096)
             self.monitored.get_images()
+

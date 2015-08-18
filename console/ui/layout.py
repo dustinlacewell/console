@@ -9,9 +9,9 @@ from console.modes import modemap
 class ImagesTab(Tab):
     label = "images"
     mode = {
-        'ctrl n': ('next-image', 'select the next image'),
-        'ctrl p': ('prev-image', 'select the previous image'),
-        'ctrl d': ('delete-image', 'delete the selected image'),
+        'ctrl n': ('next-image', 'set focus on the next image'),
+        'ctrl p': ('prev-image', 'set focus on the previous image'),
+        'ctrl d': ('delete-image', 'delete the selected image(s)'),
         'ctrl y': ('view-history', 'view history of selected image'),
         'ctrl a': ('toggle-show-all', 'toggle whether all image layers are shown'),
         'ctrl t': ('tag-image', 'tag the selected image'),
@@ -29,14 +29,14 @@ class ImagesTab(Tab):
 class ContainersTab(Tab):
     label = "containers"
     mode = {
-        'ctrl n': ('next-container', 'select the next container'),
-        'ctrl p': ('prev-container', 'select the previous container'),
-        'ctrl d': ('delete-container', 'delete the selected container'),
+        'ctrl n': ('next-container', 'set focus on the next container'),
+        'ctrl p': ('prev-container', 'set focus on the previous container'),
+        'ctrl d': ('delete-container', 'delete the selected container(s)'),
         'ctrl a': ('toggle-show-all', 'toggle whether all containers are shown'),
         'ctrl t': ('commit-container', 'commit the selected container'),
         'ctrl v': ('inspect-details', 'inspect the selected container'),
         'ctrl k': ('set-mark', 'select current container'),
-        'ctrl r': ('run-container(s)', 'run the selected container(s) in screen'), 
+        'ctrl r': ('run-container(s)', 'run the selected container(s) in screen or tmux'), 
         'ctrl u': ('unmark-containers', 'unmark all selected containers'),
         'ctrl e': ('rename-container', 'rename the selected container'),
         'ctrl f': ('inspect-changes', 'inspect changes on container filesystem'),

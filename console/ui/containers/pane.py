@@ -55,7 +55,6 @@ class ContainerPane(Pane):
         self.filter = ""
         self.commands = ""
         self.marked_containers = {}
-        self.marking_down = True
         self.in_inspect = False
         self.in_diff = False
         self.in_top = False
@@ -253,12 +252,11 @@ class ContainerPane(Pane):
             self.commands += "title %s\n" % widget.image
         self.commands += "caption always\n"
         temp = tempfile.NamedTemporaryFile()
-        name = temp.name
-        with open(name, "wt") as fout:
+        with open(temp.name, "wt") as fout:
             fout.write(self.commands)
         if self.commands == "":
             return
-        subprocess.call(["screen", "-c" "%s" % name])
+        subprocess.call(["screen", "-c" "%s" % temp.name])
         temp.close()
         app.client.close()
         raise urwid.ExitMainLoop
@@ -281,12 +279,11 @@ class ContainerPane(Pane):
         self.commands += "tmux select-window -t run-containers:1\n"
         self.commands += "tmux -2 attach-session -t run-containers\n"
         temp = tempfile.NamedTemporaryFile()
-        name = temp.name
-        with open(name, "wt") as fout:
+        with open(temp.name, "wt") as fout:
             fout.write(self.commands)
         if self.commands == "":
             return
-        subprocess.call(["rbash", "%s" % name])
+        subprocess.call(["rbash", "%s" % temp.name])
         temp.close()
         app.client.close()
         raise urwid.ExitMainLoop
@@ -441,7 +438,7 @@ class ContainerPane(Pane):
     def on_commit(self):
         widget, idx = self.listing.get_focus()
         name, tag = split_repo_name(widget.image)
-        prompt = Prompt(lambda name: self.perform_commit(widget.container, name), title="Tag Container:", initial=name)
+        prompt = Prompt(lambda name: self.perform_commit(widget.container, name), title="Tag Container", initial=name)
         self.show_dialog(prompt)
 
     @catch_docker_errors
@@ -468,7 +465,7 @@ class ContainerPane(Pane):
     def on_rename(self):
         widget, idx = self.listing.get_focus()
         name = clean_name(widget.name[0])
-        prompt = Prompt(lambda name: self.perform_rename(widget.container, name), title="Rename Container:", initial=name)
+        prompt = Prompt(lambda name: self.perform_rename(widget.container, name), title="Rename Container", initial=name)
         self.show_dialog(prompt)
         self.monitored.get_containers()
 
@@ -541,6 +538,6 @@ class ContainerPane(Pane):
         with closing(s):
             s.sendall(b'GET /events?since=%d HTTP/1.1\n\n' % self.since_time)
             header = s.recv(4096)
-            chunk2 = s.recv(4096)
+            chunk = s.recv(4096)
             self.monitored.get_containers()
 
