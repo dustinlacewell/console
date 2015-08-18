@@ -139,7 +139,7 @@ class Table(urwid.ListBox):
 
     def mark(self):
         widget, pos = self.get_focus()
-        widget.set_attr_map({None: 'reversed'})
+        widget.set_attr_map({None: 'focus'})
 
     def unmark(self):
         widget, pos = self.get_focus()

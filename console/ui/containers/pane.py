@@ -78,6 +78,8 @@ class ContainerPane(Pane):
         return Table(schema, header=True)
 
     def make_container_row(self, container):
+        if "seconds" in container['status']: 
+            container['status'] = "Up 0 minutes"
         row = self.listing.create_row({
             'Id': container['id'][:12],
             'Image': container['image'],
