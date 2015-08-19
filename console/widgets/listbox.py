@@ -22,7 +22,13 @@ class FancyListBox(urwid.LineBox):
                  trcorner=u'┐', blcorner=u'└', rline=u' ',
                  bline=u' ', brcorner=u'┘'):
 
-        self.length = len(items[2].contents) + 5
+        #self.length = len(items[2].contents) + 5
+        try:
+            x = items[2].contents
+        except:
+            x = items[2].get_text()[0]
+        #self.length = len(items[2].get_text()[0])
+        self.length = len(x)
         self.listbox = self.get_listbox(items)
 
         tline, bline = urwid.Divider(tline), urwid.Divider(bline)

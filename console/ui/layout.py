@@ -9,14 +9,17 @@ from console.modes import modemap
 class ImagesTab(Tab):
     label = "images"
     mode = {
-        'ctrl n': ('next-image', 'select the next image'),
-        'ctrl p': ('prev-image', 'select the previous image'),
-        'ctrl d': ('delete-image', 'delete the selected image'),
-        'ctrl h': ('view-history', 'view history of selected image'),
+        'ctrl n': ('next-image', 'set focus on the next image'),
+        'ctrl p': ('prev-image', 'set focus on the previous image'),
+        'ctrl d': ('delete-image', 'delete the selected image(s)'),
+        'ctrl y': ('view-history', 'view history of selected image'),
         'ctrl a': ('toggle-show-all', 'toggle whether all image layers are shown'),
         'ctrl t': ('tag-image', 'tag the selected image'),
-        'ctrl u': ('push-image', 'push the selected image'),
+        'ctrl b': ('push-image', 'push the selected image'),
         'ctrl v': ('inspect-details', 'inspect the selected image'),
+        'ctrl k': ('set-mark', 'select current image'),
+        'ctrl u': ('unmark-images', 'unmark all selected images'),
+        'ctrl l': ('pull-image', 'pull image from repository'),
     }
 
     def get_content(self):
@@ -26,12 +29,24 @@ class ImagesTab(Tab):
 class ContainersTab(Tab):
     label = "containers"
     mode = {
-        'ctrl n': ('next-container', 'select the next container'),
-        'ctrl p': ('prev-container', 'select the previous container'),
-        'ctrl d': ('delete-container', 'delete the selected container'),
+        'ctrl n': ('next-container', 'set focus on the next container'),
+        'ctrl p': ('prev-container', 'set focus on the previous container'),
+        'ctrl d': ('delete-container', 'delete the selected container(s)'),
         'ctrl a': ('toggle-show-all', 'toggle whether all containers are shown'),
         'ctrl t': ('commit-container', 'commit the selected container'),
         'ctrl v': ('inspect-details', 'inspect the selected container'),
+        'ctrl k': ('set-mark', 'select current container'),
+        'ctrl r': ('run-container(s)', 'run the selected container(s) in screen or tmux'), 
+        'ctrl u': ('unmark-containers', 'unmark all selected containers'),
+        'ctrl e': ('rename-container', 'rename the selected container'),
+        'ctrl f': ('inspect-changes', 'inspect changes on container filesystem'),
+        'ctrl g': ('restart-container', 'restart the selected container'),
+        'ctrl l': ('kill-container', 'kill the selected container'),
+        'ctrl x': ('pause-container', 'pause the selected container'),
+        'ctrl o': ('unpause-container', 'unpause the selected container'),
+        'ctrl w': ('start-container', 'start the selected container'),
+        'ctrl y': ('stop-container', 'stop the selected container'),
+        'shift tab': ('top-container', 'display running processes'),
     }
 
     def get_content(self):

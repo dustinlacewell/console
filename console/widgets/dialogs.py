@@ -2,6 +2,7 @@ import urwid
 
 from console.widgets.table import TableCell, TableRow, DeadTable
 from console.widgets.listbox import FancyListBox
+from console.app import app
 
 
 class PopupPile(urwid.Pile):
@@ -85,13 +86,8 @@ class TableDialog(PopupPile):
             cells = []
             for idx, cell in enumerate(row):
                 if headers:
-                    cells.append(
-                        TableCell(
-                            cell,
-                            weight=headers[idx].weight,
-                            align=headers[idx].align,
-                        )
-                    )
+                    cells.append({'value':cell, 'weight':headers[idx].get('weight'), 
+                        'align':headers[idx].get('align')})
                 else:
                     cells.append(TableCell(cell))
             rows.append(TableRow(cells))

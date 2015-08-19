@@ -6,7 +6,6 @@ default_global_mode = {
     ' ': ('close-dialog', 'close the current dialog'),
     'enter': ('submit-dialog', 'submit the current dialog'),
     'tab': ('next-tab', 'switch to next tab'),
-    'shift tab': ('prev-tab', 'switch to previous tab'),
 }
 
 class ModeMap(object):

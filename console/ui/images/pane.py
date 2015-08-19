@@ -1,32 +1,44 @@
-import json
-
 import urwid
 
+import os
+import json
+import docker
+import threading
+import socket
+import time
+
+from contextlib import closing
 from twisted.internet import threads, reactor
 
 from console.app import app
 from console.ui.images.inspect import ImageInspector
 from console.widgets.extra import AlwaysFocusedEdit
-from console.widgets.table import Table
+from console.widgets.table import Table, TableCell
 from console.highlights import highlighter
 from console.widgets.pane import Pane
-from console.widgets.dialogs import Prompt, MessageListBox
+from console.widgets.dialogs import Prompt, MessageListBox, TableDialog
 from console.utils import catch_docker_errors, split_repo_name
-
+from console.state import ImageMonitor
 
 class ImagePane(Pane):
     def __init__(self):
+        self.monitored = ImageMonitor(docker.Client('unix://var/run/docker.sock', '1.18'))
+        self.monitored.get_images()
         self.image_data = []
         self.images = {}
         self.edit = AlwaysFocusedEdit("filter: ", multiline=False)
         self.listing = self.init_listing()
         self.filter = ""
+        self.marked_widgets = {}
+        self.in_history = False
+        self.in_inspect = False
+        self.size = ()
         Pane.__init__(self, urwid.Frame(
             self.listing,
             self.edit,
         ))
         self.original_widget.focus_position = 'body'
-        urwid.connect_signal(app.state.images, 'image-list', self.set_images)
+        urwid.connect_signal(self.monitored, 'image-list', self.set_images)
 
     def init_listing(self):
         schema = (
@@ -76,7 +88,6 @@ class ImagePane(Pane):
                     highlighter.apply(row, 'created', 'created')
                     reactor.callLater(1, highlighter.remove, row)
 
-
         for image in untagged:
             in_tag = filter in image['tag'].lower()
             in_id = filter in image['id'].lower()
@@ -92,7 +103,19 @@ class ImagePane(Pane):
         self.listing.fix_focus()
         app.draw_screen()
 
+    def thread(self):
+        return True
+
     def keypress(self, size, event):
+        self.size = size
+        self.since_time = time.time()
+        if event == 'close-dialog':
+            if self.in_history:
+                self.in_history = False
+            if self.in_inspect:
+                self.in_inspect = False
+        if event == 'scroll-close':
+            event = 'close-dialog'
         if self.dialog:
             return super(ImagePane, self).keypress(size, event)
 
@@ -103,23 +126,58 @@ class ImagePane(Pane):
                 else:
                     self.filter = self.edit.edit_text
                     self.set_images(self.image_data, force=True)
+        
+        if event not in ['next-image', 'prev-image', 'set-mark', 'unmark-images']:
+            thread = threading.Thread(target=self.thread)
+            listener = threading.Thread(target=self.listener)
+            listener.setDaemon(True)
+            listener.start()
+            thread.start()
 
     def handle_event(self, event):
         if event == 'next-image':
             self.on_next()
+            if self.in_history or self.in_inspect:
+                self.keypress(self.size, 'scroll-close')
+                if self.in_history:
+                    self.on_history()
+                if self.in_inspect:
+                    self.on_inspect()
         elif event == 'prev-image':
             self.on_prev()
+            if self.in_history or self.in_inspect:
+                self.keypress(self.size, 'scroll-close')
+                if self.in_history:
+                    self.on_history()
+                if self.in_inspect:
+                    self.on_inspect()
         elif event == 'toggle-show-all':
             self.on_all()
+            self.monitored.get_images()
         elif event == 'delete-image':
-            self.on_delete()
+            self.delete_marked()
         elif event == 'tag-image':
             self.on_tag()
         elif event == 'inspect-details':
+            self.in_inspect = True
             self.on_inspect()
         elif event == 'help':
             self.on_help()
+        elif event == 'set-mark':
+            self.on_marked()
+        elif event == 'unmark-images':
+            self.on_unmark()
+        elif event == 'view-history':
+            self.in_history = True
+            self.on_history()
+        elif event == 'push-image':
+            self.monitored.get_images()
+            self.push()
+        elif event == 'pull-image':
+            self.pull()
+            self.monitored.get_images()
         else:
+            self.monitored.get_images()
             return super(ImagePane, self).handle_event(event)
 
     def on_next(self):
@@ -129,34 +187,61 @@ class ImagePane(Pane):
         self.listing.prev()
 
     def on_all(self):
-        app.state.images.all = not app.state.images.all
+        self.monitored.all = not self.monitored.all
 
+    def on_marked(self):
+        marked_widget, idx = self.listing.get_focus()
+        if (marked_widget in self.marked_widgets and 
+                self.marked_widgets[marked_widget] == "marked"):
+            self.marked_widgets[marked_widget] = "unmarked"
+            self.listing.unmark()
+        else:
+            self.marked_widgets[marked_widget] = "marked"
+            self.listing.mark()
 
-    # def _show_history(self, history_json, image_id):
-    #     history = json.loads(history_json)
-    #     histories = [(d.get('Id', '')[:12], d.get('CreatedBy', '')) for d in history]
-    #     dialog = TableDialog(
-    #         "History for %s" % image_id[:12],
-    #         histories,
-    #         [
-    #             TableCell("image id", align='center'),
-    #             TableCell("command", align='left', weight=4)
-    #         ]
-    #     )
-    #     dialog.width = ('relative', 90)
-    #     self.show_dialog(dialog, )
+    def on_unmark(self):
+        for key, value in self.marked_widgets.items():
+            if value == "marked":
+                self.marked_widgets[key] = "unmarked"
+                key.set_attr_map({None:None})
 
-    # @catch_docker_errors
-    # def on_history(self):
-    #     widget, idx = self.listing.get_focus()
-    #     d = threads.deferToThread(app.client.history, widget.image)
-    #     d.addCallback(self._show_history, widget.image)
-    #     d.addCallback(lambda r: app.draw_screen())
-    #     return d
+    def _show_history(self, history_json, image_id):
+        history = history_json
+        histories = [(d.get('Id', '')[:12], d.get('CreatedBy', '')) for d in history]
+        dialog = TableDialog(
+            "History for %s" % image_id[:12],
+            histories,
+            [
+                {'value':"image id", 'weight':1, 'align':'center'},
+                {'value':"command", 'weight':4, 'align':'center'}
+            ]
+        )
+        dialog.width = ('relative', 90)
+        self.show_dialog(dialog, )
 
     @catch_docker_errors
-    def on_delete(self):
+    def on_history(self):
         widget, idx = self.listing.get_focus()
+        d = threads.deferToThread(app.client.history, widget.image)
+        d.addCallback(self._show_history, widget.image)
+        d.addCallback(lambda r: app.draw_screen())
+        return d
+
+    def delete_marked(self):
+        none_marked = True
+        for key, value in self.marked_widgets.items():
+            if value == "marked" and key.tag != '<none>:<none>':
+                widget = key
+                self.on_delete(widget)
+                del self.marked_widgets[key]
+                none_marked = False
+        if none_marked:
+            widget, idx = self.listing.get_focus()
+            if widget.tag != '<none>:<none>':
+                self.on_delete(widget)
+
+    @catch_docker_errors
+    def on_delete(self, widget):
         highlighter.apply(widget, 'deleted', 'deleted')
         reactor.callLater(10, highlighter.remove, widget)
         if widget.tag == "<none>:<none>":
@@ -175,7 +260,7 @@ class ImagePane(Pane):
     def on_tag(self):
         widget, idx = self.listing.get_focus()
         name, tag = split_repo_name(widget.tag)
-        prompt = Prompt(lambda name: self.perform_tag(widget.image, name), title="Tag Image:", initial=name)
+        prompt = Prompt(lambda name: self.perform_tag(widget.image, name), title="Tag Image", initial=name)
         self.show_dialog(prompt)
 
     @catch_docker_errors
@@ -187,6 +272,8 @@ class ImagePane(Pane):
 
         def handle_response(r):
             r = r.replace("}{", "},{")
+            r = r.replace("1)\"}", "1)\"},")
+            r = r.replace("2)\"}", "2)\"},")
             r = "[%s]" % r
             messages = [d.get('status') or d.get('error') for d in json.loads(r)]
             self.show_dialog(MessageListBox(messages, title='Push Response', width=100))
@@ -196,8 +283,29 @@ class ImagePane(Pane):
         return d
 
     @catch_docker_errors
+    def perform_pull(self, repo_name):
+        name, tag = split_repo_name(repo_name)
+        self.close_dialog()
+        return threads.deferToThread(app.client.pull, name, tag or 'latest')
+
+    def pull(self):
+        repo_name = ''
+        prompt = Prompt(lambda repo_name: self.perform_pull(repo_name), title="Pull Repository", initial=repo_name)
+        self.show_dialog(prompt)
+
+    @catch_docker_errors
     def on_inspect(self):
         widget, idx = self.listing.get_focus()
         d = threads.deferToThread(app.client.inspect_image, widget.image)
         d.addCallback(lambda data: self.show_dialog(ImageInspector(data)))
         return d
+
+    def listener(self):
+        s = socket.socket(socket.AF_UNIX)
+        s.connect('/var/run/docker.sock')
+        with closing(s):
+            s.sendall(b'GET /events?since=%d HTTP/1.1\n\n' % self.since_time)
+            header = s.recv(4096)
+            chunk = s.recv(4096)
+            self.monitored.get_images()
+

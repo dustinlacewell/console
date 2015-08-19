@@ -137,6 +137,14 @@ class Table(urwid.ListBox):
         else:
             self.set_focus(pos - 1)
 
+    def mark(self):
+        widget, pos = self.get_focus()
+        widget.set_attr_map({None: 'focus'})
+
+    def unmark(self):
+        widget, pos = self.get_focus()
+        widget.set_attr_map({None: None})
+
     def keypress(self, *args, **kwargs):
         key = super(Table, self).keypress(*args, **kwargs)
         return key
